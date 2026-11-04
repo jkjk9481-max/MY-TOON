@@ -1,4 +1,4 @@
-package com.mytoon.backend.user;
+package com.mytoon.backend.user.entity;
 
 import java.time.Instant;
 
@@ -38,6 +38,9 @@ public class User {
 
     @Column(nullable = false, length = 50)
     private String nickname;
+
+    @Column(length = 255)
+    private String email;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

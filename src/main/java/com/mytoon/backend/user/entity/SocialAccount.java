@@ -1,4 +1,4 @@
-package com.mytoon.backend.user;
+package com.mytoon.backend.user.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
