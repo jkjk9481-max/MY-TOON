@@ -45,7 +45,8 @@ public class RefreshToken {
     private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt;
+    private Instant expiresAt; // 완료 시간을 DB에 직접 저장 "30일 슬라이딩 리프레시" 정책을 구현하려면
+    // 매 프레시 시점마다 이 값을 갱신 ( = 새 토큰 발급 + 이 값 재설정)
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
