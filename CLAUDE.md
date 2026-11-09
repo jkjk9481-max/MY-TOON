@@ -55,6 +55,8 @@
 - 코드 생성 후에는 동작 원리, 예외 상황, 트랜잭션, 테스트 방법을 설명한다.
 - 설명은 초보자도 이해하기 쉽게, 비유와 예시를 섞어서 한다.
 - 코드 설명 후에는 이해도 확인 질문을 던지고, 사용자가 답할 수 있는지 확인한 다음에 다음 단계로 넘어간다.
+- 새로 만든 클래스/파일이 여러 개면 한꺼번에 다 설명하지 않는다. 가장 단순한 것부터 하나씩, 실제 코드와 함께
+  쉽게 설명 → 사용자가 이해했다고 답하면 그다음 클래스로 넘어간다 (표로 전체를 한 번에 요약하는 방식 X).
 - 변경한 파일과 주요 변경 내용, 수정 이유, 테스트 방법, 실제 결과를 설명한다.
 - 남은 위험, 검증하지 못한 부분, 추가 개선 사항을 명시해 개발자가 직접 검토 후 최종 승인할 수 있게 한다.
 
@@ -93,14 +95,19 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-06 기준)
-- 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2 마이그레이션, Repository 3개, AuthService(+단위 테스트),
-  임시 dev 로그인 AuthController(+웹 계층 테스트)
-- 진행 중: AuthControllerTest 코드를 AI가 설명 → 사용자가 직접 설명해보며 이해도 확인
-- 이후: AuthService 설계 리뷰(구글/카카오 code 교환, JWT 발급/검증, Refresh Token Rotation),
-  Spring Security JWT 필터 설계, Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
-- 임시 dev 로그인 엔드포인트는 실제 OAuth 연동 시 제거/교체한다.
+## 현재 상태 / 다음 할 일 (2026-11-09 기준)
+- 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2 마이그레이션, Repository 3개, AuthService(+단위 테스트)
+- 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
+  `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
+  임시 dev 로그인 엔드포인트는 이걸로 완전히 교체/제거됨. 단위 테스트는 MockRestServiceServer로 구글/카카오
+  응답을 흉내내서 검증 (실제 브라우저 플로우/실서버 호출 테스트는 아직 안 함, Client ID/Secret은 환경변수로 주입)
+- 완료: `/api/auth/**`만 permitAll인 임시 SecurityConfig (JWT 필터 붙기 전까지의 최소 설정)
+- 이후: JWT 발급/검증, Refresh Token Rotation, Spring Security JWT 필터로 SecurityConfig 재설계,
+  Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
+- `com.mytoon.backend.oauth` — 구글/카카오 등 외부 OAuth2 프로바이더 연동 전담 (user 도메인이 아니라
+  최상위 패키지로 분리: OAuth2 클라이언트는 user의 비즈니스 로직이 아니라 외부 API 연동/인프라 성격이라서)
+- `com.mytoon.backend.config` — SecurityConfig, RestClientConfig 등 전역 설정
 - DB 마이그레이션: `src/main/resources/db/migration` (Flyway)

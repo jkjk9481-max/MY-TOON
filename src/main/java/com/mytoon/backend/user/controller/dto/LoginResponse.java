@@ -3,10 +3,6 @@ package com.mytoon.backend.user.controller.dto;
 import com.mytoon.backend.user.entity.Role;
 import com.mytoon.backend.user.service.LoginResult;
 
-/**
- * 임시 로그인 엔드포인트의 응답 바디.
- * 로그인/가입이 실제로 처리됐는지 눈으로 확인하는 용도라, 누가 로그인됐는지와 발급된 토큰 원문을 담는다.
- */
 public record LoginResponse(
         Long userId,
         String nickname,
