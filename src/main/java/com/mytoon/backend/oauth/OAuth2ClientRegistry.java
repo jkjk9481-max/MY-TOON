@@ -15,6 +15,9 @@ import com.mytoon.backend.user.entity.Provider;
 // 컨트롤러가 "구글 통역사 주세요"하면 찾아서 건네줌 . 애플 로그인이 추가돼도 여기 코드는 안바뀜
 public class OAuth2ClientRegistry {
 
+
+    // - @Component: new로 직접 안 만들어도, Spring이 미리 만들어서 보관하고 있다가 필요한 곳에 꺼내줌
+    //- Map: GOOGLE이라는 키로 찾으면, 그에 대응하는 GoogleOAuth2Client 객체(값)을 바로 꺼낼 수 있음
     private final Map<Provider, OAuth2Client> clientsByProvider;
 
     public OAuth2ClientRegistry(List<OAuth2Client> clients) {

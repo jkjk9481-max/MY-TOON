@@ -23,7 +23,7 @@ public class GoogleOAuth2Client implements OAuth2Client {
 
     public GoogleOAuth2Client(
             RestClient.Builder restClientBuilder,
-            @Value("${oauth2.google.client-id}") String clientId,
+            @Value("${oauth2.google.client-id}") String clientId, // @Value == "이 값을 코드에 직접 넣지 않고 , application.yml(또는 환경변수)에서 oauth2.google.client_id라는 설정값을 읽어서 넣어달라"는 뜻이다
             @Value("${oauth2.google.client-secret}") String clientSecret,
             @Value("${oauth2.google.redirect-uri}") String redirectUri) {
         this.restClient = restClientBuilder.build();
@@ -39,8 +39,8 @@ public class GoogleOAuth2Client implements OAuth2Client {
 
     @Override
     public OAuth2UserInfo fetchUserInfo(String code) {
-        String accessToken = exchangeCodeForAccessToken(code); // 1. code -> access token
-        GoogleUserInfoResponse userInfo = fetchGoogleUserInfo(accessToken); // 2. access token -> 유저 정보
+        String accessToken = exchangeCodeForAccessToken(code); // POST , 토큰만 받음
+        GoogleUserInfoResponse userInfo = fetchGoogleUserInfo(accessToken); // GET , 사용자 정보 받음
 
         return new OAuth2UserInfo(Provider.GOOGLE, userInfo.sub(), userInfo.email(), userInfo.name());
     }
@@ -61,7 +61,7 @@ public class GoogleOAuth2Client implements OAuth2Client {
                 .retrieve() // "응답 와라 , 받으면 GoogleTokenResponse(JSON의 access_token 필드) 자동으로 변환해준다
                 .body(GoogleTokenResponse.class);
 
-        // // 구글이 {"access_token": "ya29.xxxxx"} 같은 JSON을 주면 → tokenResponse.accessToken()으로 꺼냄
+        // 구글이 {"access_token": "ya29.xxxxx"} 같은 JSON을 주면 → tokenResponse.accessToken()으로 꺼냄
         return tokenResponse.accessToken();
     }
 

@@ -29,6 +29,9 @@ public class AuthController {
     public LoginResponse login(@PathVariable String provider, @Valid @RequestBody OAuthLoginRequest request) {
         Provider parsedProvider = Provider.valueOf(provider.toUpperCase());
         OAuth2UserInfo userInfo = oAuth2ClientRegistry.get(parsedProvider).fetchUserInfo(request.code());
+        // "parsedProvider 값으로 구글/카카오 중 담당 객체를 찾고 → 그 객체에게 code를 줘서 사용자 정보를 받아오게 시키고
+        // -> 받아온 사용자 정보를 userInfo 변수에 저장한다
+
         // "구글 담당 통역사 주세요" , 그 통역사한테 "이 코드로 유저정보 가져와" 시킴
         // 여기서 컨트롤러는 구글 통역사가 정확히 뭘 하는지 전혀 모른다
 
