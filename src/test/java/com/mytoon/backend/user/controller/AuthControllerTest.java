@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.mytoon.backend.oauth.OAuth2Client;
 import com.mytoon.backend.oauth.OAuth2ClientRegistry;
 import com.mytoon.backend.oauth.OAuth2UserInfo;
+import com.mytoon.backend.security.JwtAuthenticationFilter;
 import com.mytoon.backend.user.entity.Provider;
 import com.mytoon.backend.user.entity.Role;
 import com.mytoon.backend.user.entity.User;
@@ -40,6 +41,9 @@ class AuthControllerTest {
 
     @MockitoBean // 스프링 컨텍스트 안의 AuthService를 '가짜'로 갈아끼운다 (DB까지 안 내려감)
     private AuthService authService;
+
+    @MockitoBean // SecurityConfig가 빈을 만들 때 필요해서 끼워주는 것뿐, addFilters=false라 실제로 동작은 안 함
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     @DisplayName("올바른 로그인 요청이면 200과 함께 로그인 결과 JSON을 돌려준다")
