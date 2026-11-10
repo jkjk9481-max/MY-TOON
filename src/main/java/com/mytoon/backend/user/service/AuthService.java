@@ -11,6 +11,7 @@ import java.util.Base64;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.mytoon.backend.security.JwtTokenProvider;
 import com.mytoon.backend.user.entity.Provider;
 import com.mytoon.backend.user.entity.RefreshToken;
 import com.mytoon.backend.user.entity.Role;
@@ -32,6 +33,7 @@ public class AuthService {
     private final UserRepository userRepository; // 회원 명부
     private final SocialAccountRepository socialAccountRepository; // "구글 / 카카오 ( 우리 회원 ) " 연결표
     private final RefreshTokenRepository refreshTokenRepository; // 발급한 출입 팔찌 기록
+    private final JwtTokenProvider jwtTokenProvider; // Access Token(JWT) 발급기
 
     @Transactional
     public LoginResult loginOrRegister(Provider provider, String providerUserId, String email, String nickname) {
@@ -43,9 +45,10 @@ public class AuthService {
         //- 없으면 → "처음 오셨네" → createUserWithSocialAccount로 회원증 새로 발급 ( 회원 가입 )
 
         User user = socialAccount.getUser(); // 회원증에 적힌 '사람'을 꺼냄
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getRole()); // 오늘 쓸 '신분증' 발급
         String rawRefreshToken = issueRefreshToken(user); // 오늘 쓸 '출입 팔찌' 발급
 
-        return new LoginResult(user, rawRefreshToken); // 회원 + 팔찌를 봉투에 담아 돌려줌
+        return new LoginResult(user, accessToken, rawRefreshToken); // 회원 + 신분증 + 팔찌를 봉투에 담아 돌려줌
     }
 
     private SocialAccount createUserWithSocialAccount(

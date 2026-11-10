@@ -56,7 +56,7 @@ class AuthControllerTest {
         when(mockUser.getNickname()).thenReturn("홍길동");
         when(mockUser.getRole()).thenReturn(Role.USER);
         when(authService.loginOrRegister(eq(Provider.GOOGLE), eq("google-123"), eq("a@b.com"), eq("홍길동")))
-                .thenReturn(new LoginResult(mockUser, "raw-refresh-token"));
+                .thenReturn(new LoginResult(mockUser, "fake-access-token", "raw-refresh-token"));
 
         String body = """
                 {"code":"auth-code"}
@@ -70,6 +70,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.userId").value(1))
                 .andExpect(jsonPath("$.nickname").value("홍길동"))
                 .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.accessToken").value("fake-access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("raw-refresh-token"));
 
         // 이 테스트가 증명하는 것

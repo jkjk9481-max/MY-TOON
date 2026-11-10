@@ -2,6 +2,7 @@ package com.mytoon.backend.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.mytoon.backend.security.JwtTokenProvider;
 import com.mytoon.backend.user.entity.Provider;
 import com.mytoon.backend.user.entity.RefreshToken;
 import com.mytoon.backend.user.entity.Role;
@@ -40,7 +42,10 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
-    @InjectMocks // "위에서 만든 가짜 서랍 3개를 생성자에 끼워 넣어서 진짜 AuthService를 조립해줘"
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @InjectMocks // "위에서 만든 가짜 서랍 4개를 생성자에 끼워 넣어서 진짜 AuthService를 조립해줘"
     // 대역들을 넣어서 만든 '진짜' 서비스
     private AuthService authService;
 
@@ -56,6 +61,7 @@ class AuthServiceTest {
         // any(User.class) = "어떤 User가 들어오든 상관없어". 인자를 정확히 안맞춰도 되게하는 와일드카드
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(socialAccountRepository.save(any(SocialAccount.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtTokenProvider.generateAccessToken(any(), eq(Role.USER))).thenReturn("fake-access-token");
 
         // when
         LoginResult result = authService.loginOrRegister(Provider.GOOGLE, "google-123", "a@b.com", "홍길동");
@@ -82,6 +88,8 @@ class AuthServiceTest {
         verify(refreshTokenRepository).save(any(RefreshToken.class));
         assertThat(result.user()).isSameAs(savedUser); // "똑같은 객체"여야함
         assertThat(result.refreshToken()).isNotBlank(); // 비어있지 않아야함
+        // Access Token도 JwtTokenProvider가 발급한 값이 그대로 담겨야 한다
+        assertThat(result.accessToken()).isEqualTo("fake-access-token");
     }
 
     @Test
@@ -97,6 +105,7 @@ class AuthServiceTest {
                 .build();
         when(socialAccountRepository.findByProviderAndProviderUserId(Provider.KAKAO, "kakao-999"))
                 .thenReturn(Optional.of(existingAccount));
+        when(jwtTokenProvider.generateAccessToken(any(), eq(Role.USER))).thenReturn("fake-access-token");
 
         // when
         LoginResult result = authService.loginOrRegister(Provider.KAKAO, "kakao-999", "ignored@b.com", "무시됨");
@@ -107,6 +116,7 @@ class AuthServiceTest {
         // 하지만 로그인마다 토큰은 '추가' 발급된다 (멀티 디바이스 정책)
         verify(refreshTokenRepository).save(any(RefreshToken.class));
         assertThat(result.user()).isSameAs(existingUser);
+        assertThat(result.accessToken()).isEqualTo("fake-access-token");
     }
 
     @Test
