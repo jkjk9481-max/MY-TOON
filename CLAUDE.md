@@ -55,6 +55,8 @@
 - 코드 생성 후에는 동작 원리, 예외 상황, 트랜잭션, 테스트 방법을 설명한다.
 - 설명은 초보자도 이해하기 쉽게, 비유와 예시를 섞어서 한다.
 - 코드 설명 후에는 이해도 확인 질문을 던지고, 사용자가 답할 수 있는지 확인한 다음에 다음 단계로 넘어간다.
+- 새 세션을 시작할 때, 바로 새 코드로 들어가기 전에 지난 세션에서 배운 핵심 내용 2~3개를 간단한 질문(퀴즈 형식)으로
+  복습시키고 확인한 뒤 진행한다. 다음날이면 까먹을 수 있다는 걸 전제로, 복습을 기본 루틴에 포함한다.
 - 새로 만든 클래스/파일이 여러 개면 한꺼번에 다 설명하지 않는다. 가장 단순한 것부터 하나씩, 실제 코드와 함께
   쉽게 설명 → 사용자가 이해했다고 답하면 그다음 클래스로 넘어간다 (표로 전체를 한 번에 요약하는 방식 X).
 - 변경한 파일과 주요 변경 내용, 수정 이유, 테스트 방법, 실제 결과를 설명한다.
@@ -95,14 +97,19 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-09 기준)
+## 현재 상태 / 다음 할 일 (2026-11-10 기준)
 - 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
   임시 dev 로그인 엔드포인트는 이걸로 완전히 교체/제거됨. 단위 테스트는 MockRestServiceServer로 구글/카카오
   응답을 흉내내서 검증 (실제 브라우저 플로우/실서버 호출 테스트는 아직 안 함, Client ID/Secret은 환경변수로 주입)
-- 완료: `/api/auth/**`만 permitAll인 임시 SecurityConfig (JWT 필터 붙기 전까지의 최소 설정)
-- 이후: JWT 발급/검증, Refresh Token Rotation, Spring Security JWT 필터로 SecurityConfig 재설계,
+- 완료: JWT Access Token 발급 — `com.mytoon.backend.security.JwtTokenProvider`(jjwt, HS256, 비밀키는
+  `JWT_SECRET` 환경변수). `AuthService.loginOrRegister`가 로그인/가입 성공 시 Access Token도 즉석 발급해서
+  `LoginResult`/`LoginResponse`에 포함 (Refresh Token과 달리 DB 저장 안 함 — 서명 자체로 검증 가능해서)
+- 완료: JWT 인증 필터 + `SecurityConfig` 재설계 — `JwtAuthenticationFilter`가 Authorization 헤더의 Bearer
+  토큰을 검증해 SecurityContext에 등록, `/api/auth/**`만 permitAll, 나머지는 인증 필요, stateless 세션,
+  인증 실패 시 401 반환. 단위 테스트까지만 검증됨 (보호된 실제 엔드포인트가 아직 없어 통합 검증은 못 함)
+- 이후: Refresh Token Rotation 엔드포인트(`/api/auth/refresh`), 로그아웃(Refresh Token 무효화),
   Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
 
 ## 코드 구조
