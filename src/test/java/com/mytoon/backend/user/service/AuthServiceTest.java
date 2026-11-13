@@ -1,6 +1,7 @@
 package com.mytoon.backend.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +20,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.mytoon.backend.security.JwtTokenProvider;
 import com.mytoon.backend.user.entity.Provider;
@@ -147,6 +151,100 @@ class AuthServiceTest {
         assertThat(savedToken.getExpiresAt())
                 .isAfter(beforeCall.plus(29, ChronoUnit.DAYS))
                 .isBefore(beforeCall.plus(31, ChronoUnit.DAYS));
+    }
+
+    @Test
+    @DisplayName("정상 Refresh Token이면 기존 토큰은 폐기(revoke)되고 새 Access/Refresh Token이 발급된다")
+    void refresh_validToken_rotatesAndIssuesNewTokens() {
+        // given
+        User user = User.builder()
+                .nickname("홍길동").email("a@b.com")
+                .role(Role.USER).status(UserStatus.ACTIVE)
+                .build();
+        RefreshToken existingToken = RefreshToken.builder()
+                .user(user)
+                .tokenHash("old-hash")
+                .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS))
+                .build();
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(existingToken));
+        when(jwtTokenProvider.generateAccessToken(any(), eq(Role.USER))).thenReturn("new-access-token");
+
+        // when
+        LoginResult result = authService.refresh("raw-refresh-token");
+
+        // then: 쓴 토큰은 폐기됐어야 한다 (= 재사용 시도 시 바로 걸림)
+        assertThat(existingToken.isRevoked()).isTrue();
+        // 새 Refresh Token이 하나 더 발급돼서 저장됐어야 한다
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        assertThat(result.user()).isSameAs(user);
+        assertThat(result.accessToken()).isEqualTo("new-access-token");
+        assertThat(result.refreshToken()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 Refresh Token이면 401을 던진다")
+    void refresh_unknownToken_throwsUnauthorized() {
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh("no-such-token"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting("statusCode").isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("이미 폐기된(재사용된) Refresh Token이 들어오면 탈취로 간주해 해당 유저의 모든 기기 토큰을 무효화한다")
+    void refresh_reusedRevokedToken_revokesAllActiveTokensOfUser() {
+        // given: 이미 rotation으로 폐기된 토큰이 다시 들어온 상황
+        User user = User.builder()
+                .nickname("홍길동").email("a@b.com")
+                .role(Role.USER).status(UserStatus.ACTIVE)
+                .build();
+        RefreshToken reusedToken = RefreshToken.builder()
+                .user(user)
+                .tokenHash("old-hash")
+                .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS))
+                .build();
+        reusedToken.revoke(); // 이미 한 번 폐기됐던 상태
+
+        RefreshToken otherActiveToken = RefreshToken.builder()
+                .user(user)
+                .tokenHash("other-hash")
+                .expiresAt(Instant.now().plus(5, ChronoUnit.DAYS))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(reusedToken));
+        when(refreshTokenRepository.findAllByUserAndRevokedFalse(user)).thenReturn(List.of(otherActiveToken));
+
+        // when / then
+        assertThatThrownBy(() -> authService.refresh("stolen-raw-token"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting("statusCode").isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 같은 유저의 다른 살아있는 토큰(다른 기기)도 전부 폐기됐어야 한다
+        assertThat(otherActiveToken.isRevoked()).isTrue();
+        verify(jwtTokenProvider, never()).generateAccessToken(any(), any());
+    }
+
+    @Test
+    @DisplayName("만료된 Refresh Token이면 401을 던지고 새 토큰을 발급하지 않는다")
+    void refresh_expiredToken_throwsUnauthorized() {
+        User user = User.builder()
+                .nickname("홍길동").email("a@b.com")
+                .role(Role.USER).status(UserStatus.ACTIVE)
+                .build();
+        RefreshToken expiredToken = RefreshToken.builder()
+                .user(user)
+                .tokenHash("old-hash")
+                .expiresAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .build();
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(expiredToken));
+
+        assertThatThrownBy(() -> authService.refresh("expired-raw-token"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting("statusCode").isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        verify(jwtTokenProvider, never()).generateAccessToken(any(), any());
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
     }
 
     //  Q2  │ empty()=없음→신규, of(계정)=있음→단골 (스위치!)        │

@@ -51,4 +51,15 @@ public class RefreshToken {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "revoked", nullable = false)
+    private boolean revoked;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    public void revoke() {
+        this.revoked = true;
+        this.revokedAt = Instant.now();
+    }
 }

@@ -7,9 +7,12 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.mytoon.backend.security.JwtTokenProvider;
 import com.mytoon.backend.user.entity.Provider;
@@ -70,6 +73,37 @@ public class AuthService {
                         .providerUserId(providerUserId)
                         .build()
         );
+    }
+
+    @Transactional
+    public LoginResult refresh(String rawToken) {
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(rawToken))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
+
+        if (refreshToken.isRevoked()) {
+            // 이미 폐기된(= 한 번 쓰인) 토큰이 다시 들어옴 -> 탈취 의심 -> 이 유저의 모든 기기 로그아웃
+            revokeAllActiveTokensOf(refreshToken.getUser());
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "이미 사용된 Refresh Token입니다. 보안을 위해 모든 기기에서 로그아웃되었습니다.");
+        }
+
+        if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해주세요.");
+        }
+
+        refreshToken.revoke(); // Rotation: 이번에 쓴 토큰은 폐기하고 새 토큰을 발급
+
+        User user = refreshToken.getUser();
+        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getRole());
+        String newRawRefreshToken = issueRefreshToken(user);
+
+        return new LoginResult(user, newAccessToken, newRawRefreshToken);
+    }
+
+    private void revokeAllActiveTokensOf(User user) {
+        List<RefreshToken> activeTokens = refreshTokenRepository.findAllByUserAndRevokedFalse(user);
+        activeTokens.forEach(RefreshToken::revoke);
     }
 
     private String issueRefreshToken(User user) {

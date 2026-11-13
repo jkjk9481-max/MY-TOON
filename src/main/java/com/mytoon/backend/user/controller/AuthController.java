@@ -10,6 +10,7 @@ import com.mytoon.backend.oauth.OAuth2ClientRegistry;
 import com.mytoon.backend.oauth.OAuth2UserInfo;
 import com.mytoon.backend.user.controller.dto.LoginResponse;
 import com.mytoon.backend.user.controller.dto.OAuthLoginRequest;
+import com.mytoon.backend.user.controller.dto.RefreshTokenRequest;
 import com.mytoon.backend.user.entity.Provider;
 import com.mytoon.backend.user.service.AuthService;
 import com.mytoon.backend.user.service.LoginResult;
@@ -41,6 +42,12 @@ public class AuthController {
                 userInfo.email(),
                 userInfo.nickname()
         );
+        return LoginResponse.from(result);
+    }
+
+    @PostMapping("/refresh")
+    public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        LoginResult result = authService.refresh(request.refreshToken());
         return LoginResponse.from(result);
     }
 }
