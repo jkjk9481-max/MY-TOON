@@ -75,7 +75,9 @@ public class AuthService {
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    // 탈취 의심 시 "다른 기기 토큰 전체 무효화"를 해놓고 401을 던지는데, 기본 설정이면 예외 때문에
+    // 그 무효화 자체가 롤백되어 버린다. 그래서 이 예외만큼은 롤백하지 않도록 예외처리.
     public LoginResult refresh(String rawToken) {
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(rawToken))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
