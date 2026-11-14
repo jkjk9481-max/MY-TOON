@@ -97,7 +97,7 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-14 기준)
+## 현재 상태 / 다음 할 일 (2026-11-15 기준)
 - 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2·V3 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
@@ -121,26 +121,45 @@
   컬럼은 title(UNIQUE, 100자) / description(TEXT, NULL 허용) / author_name(50자) / created_at 만 있음.
   작가는 별도 테이블 없이 문자열로 저장(본인 작품 중심이라서, 다른 작가 등록 시점에 분리 검토).
   실제 Postgres 테스트로 UNIQUE·NOT NULL 검증. 관리자 등록 API는 아직 없음
-- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 30개 통과 확인)
+- 완료: Episode 엔티티 + V5 마이그레이션 + `EpisodeRepository` + `EpisodeStatus`(DRAFT/PREVIEW/PUBLIC) (2026-11-15, 커밋 4b49ad3).
+  컬럼: webtoon_id(FK) / episode_number(INT, 1 이상) / title(100자) / status / created_at. 삭제 컬럼 없음.
+  제약: `(webtoon_id, episode_number)` UNIQUE, `(webtoon_id, title)` UNIQUE, 번호 CHECK ≥ 1, 상태 CHECK,
+  FK `ON DELETE RESTRICT`(회차가 남은 작품은 삭제 불가). 실제 Postgres 테스트 8개로 검증. 관리자 API는 아직 없음
+- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 38개 통과 확인)
+
+## 확정된 설계 결정 (Episode, 2026-11-15)
+- 회차 번호: 작품 안에서 유일, 1부터 시작, **건너뛰기 금지** (DB 제약으로는 못 막으므로 관리자 API에서
+  "새 번호 = 현재 마지막 번호 + 1"만 허용하도록 검사. 동시 등록은 UNIQUE가 마지막 방어선)
+- 회차 제목: 작품 안에서 중복 불가 (다른 작품끼리는 같은 제목 가능). 앞뒤 공백 trim은 API에서 처리
+- 공개 상태: `status` 컬럼만 먼저 (DRAFT 임시저장 / PREVIEW 미리보기 / PUBLIC 무료 공개).
+  예약 공개 일시(`free_release_at` 등)는 Phase 2에서 **새 마이그레이션(V6~)으로 NULL 허용 컬럼 추가**.
+  그 전까지 공개 전환은 관리자가 수동으로 상태를 바꿈 (자동 전환·"다음 회차 예정일" 표시는 불가).
+  이미 적용된 마이그레이션 파일은 수정하지 않는다 (Flyway 검증 에러)
+- 삭제 정책: **하드 삭제 + 마지막 회차만 삭제 가능** (번호 구멍 방지). 중간 회차는 DRAFT로 숨기기만 가능.
+  삭제 규칙은 관리자 API 단계에서 서비스 코드로 구현. 작품 삭제는 회차가 0개일 때만(FK RESTRICT).
+  Phase 2에서 잉크로 구매된 회차를 지울 수 있는지는 그때 다시 정할 것
+- 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
-- 복습 퀴즈 후보: ① 변경 감지(Dirty Checking) — `logout()`이 `save()` 없이 저장되는 이유와 `@Transactional` 필요성,
-  ② `refresh`는 폐기된 토큰 재사용 시 전체 폐기, `logout`은 조용히 204인 이유(정상 상황 vs 탈취 의심),
-  ③ 단위 테스트(가짜 Repository)로는 못 잡고 실제 DB 통합 테스트로만 잡히는 버그 사례(롤백, 저장 누락)
-- 다음 작업: **Episode 엔티티 설계** (구현 전에 도윤이 먼저 정할 것)
-  - 회차 번호: 작품 안에서 중복 불가 `(webtoon_id, 회차 번호)` UNIQUE로 갈지 (사실상 확정 예상)
-  - 회차 제목: 작품 안에서 중복 불가로 할지 (도윤 정책)
-  - 공개 상태(임시저장/미리보기/무료 공개 등)를 이번에 어디까지 넣을지 — Phase 2 잉크·예약 공개와 맞물림
-  - 삭제 정책: 하드 삭제 vs 소프트 삭제 (정해지면 Webtoon 쪽에도 반영, 소프트 삭제 시 UNIQUE title이 삭제된 작품 제목을 계속 점유하는 문제 고려)
-  - 범위: 엔티티·마이그레이션·Repository까지만 먼저, 관리자 API는 그다음 (ADMIN 권한 검사는 SecurityConfig 변경이라 승인 필요)
-- 그 뒤: 관리자용 작품·회차 등록 API(제목 앞뒤 공백 trim 처리 필요 — UNIQUE는 `"경찰"`과 `"경찰 "`을 다른 값으로 봄),
-  이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
+- 복습 퀴즈 후보 (지난 세션에서 헷갈려 했던 것 위주로 다시):
+  ① `logout`은 폐기된 토큰이 와도 조용히 204, `refresh`는 전체 폐기하는 이유 (정상 상황 vs 탈취 의심)
+  ② 단위 테스트(가짜 Repository)로는 못 잡고 실제 DB 통합 테스트로만 잡히는 버그 (트랜잭션 없으면 DB 반영 안 됨)
+  ③ Access Token / Refresh Token 역할 구분과 Rotation 흐름 (`refresh` 때 옛 Refresh Token 폐기 + 새 Access·Refresh 발급)
+  ④ FK `RESTRICT`가 무슨 뜻인지, 그리고 번호 건너뛰기 금지를 DB가 아니라 API에서 검사하는 이유
+- 코드 설명이 아직 안 끝남: Episode 관련 새 파일은 `EpisodeStatus` → `Episode` → V5 SQL → `EpisodeRepository` →
+  테스트 순서로 하나씩 설명하고 이해도 확인 (한꺼번에 설명 X)
+- 다음 작업: **관리자용 작품·회차 등록 API** (구현 전에 설계 방안과 변경 범위를 먼저 설명하고 승인받을 것)
+  - ADMIN 권한 검사는 SecurityConfig 변경이라 승인 필요
+  - 작품 제목·회차 제목 앞뒤 공백 trim 처리 (UNIQUE는 `"경찰"`과 `"경찰 "`을 다른 값으로 봄)
+  - 회차 등록: 번호 = 마지막 번호 + 1 검사, 동시 등록 시 UNIQUE 위반을 깔끔한 에러로 변환
+  - 회차 삭제: 마지막 회차만 허용
+- 그 뒤: 이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
 - 알려진 한계/미검증: Access Token은 로그아웃 후에도 최대 1시간 유효, 실제 구글/카카오 서버 호출·브라우저 플로우는 미검증,
   JWT 필터는 보호된 실제 엔드포인트가 없어 통합 검증 못 함
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
-- `com.mytoon.backend.webtoon.{entity, repository}` — 작품(Webtoon). 회차(Episode)도 여기에 추가 예정
+- `com.mytoon.backend.webtoon.{entity, repository}` — 작품(Webtoon)과 회차(Episode, EpisodeStatus)
 - `com.mytoon.backend.oauth` — 구글/카카오 등 외부 OAuth2 프로바이더 연동 전담 (user 도메인이 아니라
   최상위 패키지로 분리: OAuth2 클라이언트는 user의 비즈니스 로직이 아니라 외부 API 연동/인프라 성격이라서)
 - `com.mytoon.backend.config` — SecurityConfig, RestClientConfig 등 전역 설정
