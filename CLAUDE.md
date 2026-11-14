@@ -117,11 +117,30 @@
   없는 토큰/이미 폐기된 토큰이어도 조용히 204 (멱등), `refresh`와 달리 전체 폐기는 하지 않음.
   `revoke()` 후 `save()` 없이 JPA 변경 감지(Dirty Checking)로 저장되므로 `@Transactional` 필수.
   한계: Access Token은 서버에서 취소할 수 없어 로그아웃 후에도 최대 1시간 유효. 실제 DB 통합 테스트로 검증
-- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 26개 통과 확인)
-- 이후: Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
+- 완료: Webtoon 엔티티 + V4 마이그레이션 + `WebtoonRepository` (패키지 `com.mytoon.backend.webtoon.{entity, repository}`).
+  컬럼은 title(UNIQUE, 100자) / description(TEXT, NULL 허용) / author_name(50자) / created_at 만 있음.
+  작가는 별도 테이블 없이 문자열로 저장(본인 작품 중심이라서, 다른 작가 등록 시점에 분리 검토).
+  실제 Postgres 테스트로 UNIQUE·NOT NULL 검증. 관리자 등록 API는 아직 없음
+- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 30개 통과 확인)
+
+## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
+- 복습 퀴즈 후보: ① 변경 감지(Dirty Checking) — `logout()`이 `save()` 없이 저장되는 이유와 `@Transactional` 필요성,
+  ② `refresh`는 폐기된 토큰 재사용 시 전체 폐기, `logout`은 조용히 204인 이유(정상 상황 vs 탈취 의심),
+  ③ 단위 테스트(가짜 Repository)로는 못 잡고 실제 DB 통합 테스트로만 잡히는 버그 사례(롤백, 저장 누락)
+- 다음 작업: **Episode 엔티티 설계** (구현 전에 도윤이 먼저 정할 것)
+  - 회차 번호: 작품 안에서 중복 불가 `(webtoon_id, 회차 번호)` UNIQUE로 갈지 (사실상 확정 예상)
+  - 회차 제목: 작품 안에서 중복 불가로 할지 (도윤 정책)
+  - 공개 상태(임시저장/미리보기/무료 공개 등)를 이번에 어디까지 넣을지 — Phase 2 잉크·예약 공개와 맞물림
+  - 삭제 정책: 하드 삭제 vs 소프트 삭제 (정해지면 Webtoon 쪽에도 반영, 소프트 삭제 시 UNIQUE title이 삭제된 작품 제목을 계속 점유하는 문제 고려)
+  - 범위: 엔티티·마이그레이션·Repository까지만 먼저, 관리자 API는 그다음 (ADMIN 권한 검사는 SecurityConfig 변경이라 승인 필요)
+- 그 뒤: 관리자용 작품·회차 등록 API(제목 앞뒤 공백 trim 처리 필요 — UNIQUE는 `"경찰"`과 `"경찰 "`을 다른 값으로 봄),
+  이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
+- 알려진 한계/미검증: Access Token은 로그아웃 후에도 최대 1시간 유효, 실제 구글/카카오 서버 호출·브라우저 플로우는 미검증,
+  JWT 필터는 보호된 실제 엔드포인트가 없어 통합 검증 못 함
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
+- `com.mytoon.backend.webtoon.{entity, repository}` — 작품(Webtoon). 회차(Episode)도 여기에 추가 예정
 - `com.mytoon.backend.oauth` — 구글/카카오 등 외부 OAuth2 프로바이더 연동 전담 (user 도메인이 아니라
   최상위 패키지로 분리: OAuth2 클라이언트는 user의 비즈니스 로직이 아니라 외부 API 연동/인프라 성격이라서)
 - `com.mytoon.backend.config` — SecurityConfig, RestClientConfig 등 전역 설정
