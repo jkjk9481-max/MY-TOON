@@ -97,8 +97,8 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-10 기준)
-- 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2 마이그레이션, Repository 3개, AuthService(+단위 테스트)
+## 현재 상태 / 다음 할 일 (2026-11-14 기준)
+- 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2·V3 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
   임시 dev 로그인 엔드포인트는 이걸로 완전히 교체/제거됨. 단위 테스트는 MockRestServiceServer로 구글/카카오
@@ -109,8 +109,16 @@
 - 완료: JWT 인증 필터 + `SecurityConfig` 재설계 — `JwtAuthenticationFilter`가 Authorization 헤더의 Bearer
   토큰을 검증해 SecurityContext에 등록, `/api/auth/**`만 permitAll, 나머지는 인증 필요, stateless 세션,
   인증 실패 시 401 반환. 단위 테스트까지만 검증됨 (보호된 실제 엔드포인트가 아직 없어 통합 검증은 못 함)
-- 이후: Refresh Token Rotation 엔드포인트(`/api/auth/refresh`), 로그아웃(Refresh Token 무효화),
-  Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
+- 완료: Refresh Token Rotation — `POST /api/auth/refresh`. 쓴 토큰은 폐기(revoke)하고 새 토큰 발급,
+  이미 폐기된 토큰이 다시 오면 탈취로 간주해 그 유저의 모든 기기 토큰을 전체 폐기 + 401.
+  `@Transactional(noRollbackFor = ResponseStatusException.class)` 필요 (예외 때문에 전체 폐기가 롤백되던 버그를 수정).
+  실제 DB 통합 테스트(`AuthRefreshIntegrationTest`)로 검증
+- 완료: 로그아웃 — `POST /api/auth/logout` (body: refreshToken, 204). 이 기기의 토큰 하나만 폐기(다른 기기 유지).
+  없는 토큰/이미 폐기된 토큰이어도 조용히 204 (멱등), `refresh`와 달리 전체 폐기는 하지 않음.
+  `revoke()` 후 `save()` 없이 JPA 변경 감지(Dirty Checking)로 저장되므로 `@Transactional` 필수.
+  한계: Access Token은 서버에서 취소할 수 없어 로그아웃 후에도 최대 1시간 유효. 실제 DB 통합 테스트로 검증
+- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 26개 통과 확인)
+- 이후: Webtoon·Episode 엔티티, 이미지 업로드, 뷰어, 접근 권한
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
