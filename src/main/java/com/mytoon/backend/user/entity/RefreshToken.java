@@ -59,7 +59,7 @@ public class RefreshToken {
     private Instant revokedAt;
 
     public void revoke() {
-        this.revoked = true;
-        this.revokedAt = Instant.now();
+        this.revoked = true; // false -> true
+        this.revokedAt = Instant.now(); // null -> 지금 시각
     }
 }
