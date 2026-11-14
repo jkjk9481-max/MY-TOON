@@ -93,4 +93,62 @@ class AuthRefreshIntegrationTest {
                         .content("{\"refreshToken\":\"" + secondRefreshToken + "\"}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @DisplayName("실제 DB에서: 한 기기만 로그아웃하면 그 토큰만 폐기되고, 다른 기기는 유지되며, 같은 요청을 반복해도 204다")
+    void logout_realToken_revokesOnlyThatDevice() throws Exception {
+        String providerUserId = "integration-test-" + UUID.randomUUID();
+
+        OAuth2Client googleClient = mock(OAuth2Client.class);
+        when(oAuth2ClientRegistry.get(Provider.GOOGLE)).thenReturn(googleClient);
+        when(googleClient.fetchUserInfo("auth-code"))
+                .thenReturn(new OAuth2UserInfo(Provider.GOOGLE, providerUserId, "it@test.com", "통합테스트유저"));
+
+        // 같은 계정으로 두 번 로그인 = 두 기기(폰, PC)
+        String phoneJson = mockMvc.perform(post("/api/auth/google/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"auth-code\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String pcJson = mockMvc.perform(post("/api/auth/google/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"auth-code\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        createdUserId = ((Number) JsonPath.read(phoneJson, "$.userId")).longValue();
+        String phoneToken = JsonPath.read(phoneJson, "$.refreshToken");
+        String pcToken = JsonPath.read(pcJson, "$.refreshToken");
+
+        // 1) 폰에서 로그아웃 -> 204
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + phoneToken + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // 2) 같은 요청을 또 보내도(연타/재시도) 에러 없이 204
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + phoneToken + "\"}"))
+                .andExpect(status().isNoContent());
+
+        // 3) 존재하지 않는 토큰도 204
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"no-such-token\"}"))
+                .andExpect(status().isNoContent());
+
+        // 4) 로그아웃 안 한 PC 토큰은 여전히 유효 -> refresh 성공
+        //    (반드시 5번보다 먼저: 5번은 재사용 감지로 PC 토큰까지 전부 폐기시키기 때문)
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + pcToken + "\"}"))
+                .andExpect(status().isOk());
+
+        // 5) 로그아웃한 폰 토큰으로 refresh -> 거부 (폐기된 토큰 재사용이므로 기존 정책대로 401)
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + phoneToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
 }

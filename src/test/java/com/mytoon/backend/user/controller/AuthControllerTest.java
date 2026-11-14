@@ -99,4 +99,26 @@ class AuthControllerTest {
         verify(oAuth2ClientRegistry, never()).get(any());
         verify(authService, never()).loginOrRegister(any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("로그아웃 요청이면 204를 돌려주고 서비스에 Refresh Token을 전달한다")
+    void logout_validRequest_returnsNoContent() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"raw-token\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("raw-token");
+    }
+
+    @Test
+    @DisplayName("로그아웃 요청의 refreshToken이 비어 있으면 400을 반환하고 서비스는 호출되지 않는다")
+    void logout_blankToken_returnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).logout(any());
+    }
 }

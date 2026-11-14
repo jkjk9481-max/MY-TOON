@@ -1,9 +1,11 @@
 package com.mytoon.backend.user.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mytoon.backend.oauth.OAuth2ClientRegistry;
@@ -49,5 +51,11 @@ public class AuthController {
     public LoginResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
         LoginResult result = authService.refresh(request.refreshToken());
         return LoginResponse.from(result);
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.refreshToken());
     }
 }

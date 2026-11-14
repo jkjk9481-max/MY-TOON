@@ -247,6 +247,57 @@ class AuthServiceTest {
         verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
     }
 
+    @Test
+    @DisplayName("로그아웃하면 해당 Refresh Token 하나만 폐기되고, 같은 유저의 다른 기기 토큰은 그대로다")
+    void logout_validToken_revokesOnlyThatToken() {
+        User user = User.builder()
+                .nickname("홍길동").email("a@b.com")
+                .role(Role.USER).status(UserStatus.ACTIVE)
+                .build();
+        RefreshToken thisDevice = RefreshToken.builder()
+                .user(user).tokenHash("hash")
+                .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS))
+                .build();
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(thisDevice));
+
+        authService.logout("raw-token");
+
+        assertThat(thisDevice.isRevoked()).isTrue();
+        // 다른 기기 토큰을 찾아서 폐기하는 로직 자체가 호출되지 않아야 한다
+        verify(refreshTokenRepository, never()).findAllByUserAndRevokedFalse(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 토큰으로 로그아웃해도 에러 없이 조용히 끝난다")
+    void logout_unknownToken_doesNothing() {
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        authService.logout("no-such-token"); // 예외가 나면 테스트 실패
+
+        verify(refreshTokenRepository, never()).findAllByUserAndRevokedFalse(any());
+    }
+
+    @Test
+    @DisplayName("이미 폐기된 토큰으로 로그아웃하면 조용히 끝나고, 탈취로 간주하지 않으며, 폐기 시각도 덮어쓰지 않는다")
+    void logout_alreadyRevokedToken_isIdempotentAndNotTreatedAsTheft() {
+        User user = User.builder()
+                .nickname("홍길동").email("a@b.com")
+                .role(Role.USER).status(UserStatus.ACTIVE)
+                .build();
+        RefreshToken revokedToken = RefreshToken.builder()
+                .user(user).tokenHash("hash")
+                .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS))
+                .build();
+        revokedToken.revoke();
+        Instant firstRevokedAt = revokedToken.getRevokedAt();
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(revokedToken));
+
+        authService.logout("raw-token");
+
+        assertThat(revokedToken.getRevokedAt()).isEqualTo(firstRevokedAt);
+        verify(refreshTokenRepository, never()).findAllByUserAndRevokedFalse(any()); // 전체 폐기 안 함
+    }
+
     //  Q2  │ empty()=없음→신규, of(계정)=있음→단골 (스위치!)        │
     //├─────┼────────────────────────────────────────────────────────┤
     //│ Q3  │ never().save() = "단골한테 새 User 안 만든다"는 증명   │

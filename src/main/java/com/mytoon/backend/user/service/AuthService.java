@@ -103,6 +103,16 @@ public class AuthService {
         return new LoginResult(user, newAccessToken, newRawRefreshToken);
     }
 
+    // 로그아웃: 이 기기의 Refresh Token 하나만 폐기한다 (다른 기기는 그대로).
+    // 없는 토큰이거나 이미 폐기된 토큰이어도 에러 없이 조용히 끝낸다 (멱등).
+    // refresh()와 달리 폐기된 토큰이 와도 "탈취 의심 전체 폐기"는 하지 않는다 - 연타/재시도 같은 정상 상황이기 때문.
+    @Transactional
+    public void logout(String rawToken) {
+        refreshTokenRepository.findByTokenHash(hash(rawToken))
+                .filter(token -> !token.isRevoked()) // 이미 폐기된 건 revokedAt이 덮어써지지 않게 건드리지 않음
+                .ifPresent(RefreshToken::revoke); // 토큰 객체의 값이 바뀌면 , 그걸 알아채서 메서드 끝에서 자동으로 DB에 저장해둠
+    }
+
     private void revokeAllActiveTokensOf(User user) {
         List<RefreshToken> activeTokens = refreshTokenRepository.findAllByUserAndRevokedFalse(user);
         activeTokens.forEach(RefreshToken::revoke);
