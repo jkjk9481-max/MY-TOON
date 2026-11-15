@@ -13,7 +13,7 @@ import com.mytoon.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
-// /api/auth/**(로그인)만 통과시키고, 나머지 요청은 JwtAuthenticationFilter가 검증한 Access Token이 있어야 통과한다.
+// /api/auth/**(로그인)만 통과시키고, /api/admin/**은 ADMIN만, 나머지 요청은 JwtAuthenticationFilter가 검증한 Access Token이 있어야 통과한다.
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN") // 관리자 API는 ADMIN만 (JWT의 role이 ROLE_ADMIN으로 등록됨)
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception

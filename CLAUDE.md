@@ -135,9 +135,16 @@
   예약 공개 일시(`free_release_at` 등)는 Phase 2에서 **새 마이그레이션(V6~)으로 NULL 허용 컬럼 추가**.
   그 전까지 공개 전환은 관리자가 수동으로 상태를 바꿈 (자동 전환·"다음 회차 예정일" 표시는 불가).
   이미 적용된 마이그레이션 파일은 수정하지 않는다 (Flyway 검증 에러)
-- 삭제 정책: **하드 삭제 + 마지막 회차만 삭제 가능** (번호 구멍 방지). 중간 회차는 DRAFT로 숨기기만 가능.
+- 삭제 정책: **하드 삭제 + 마지막 회차이면서 PUBLIC이 아닐 때만 삭제 가능** (번호 구멍 방지).
   삭제 규칙은 관리자 API 단계에서 서비스 코드로 구현. 작품 삭제는 회차가 0개일 때만(FK RESTRICT).
-  Phase 2에서 잉크로 구매된 회차를 지울 수 있는지는 그때 다시 정할 것
+  **한번 PUBLIC이 된 회차는 영구히 삭제·숨김 불가** (그래서 PUBLIC 회차가 있는 작품도 삭제 불가).
+  Phase 2에서 잉크로 구매된 PREVIEW 회차를 지울 수 있는지는 그때 다시 정할 것
+- 상태 전환(2026-11-15 확정): **앞으로만 이동** DRAFT → PREVIEW → PUBLIC (DRAFT → PUBLIC 직행 허용).
+  PREVIEW → DRAFT, PUBLIC → 이전 상태는 금지(409). 새 회차의 초기 상태는 항상 DRAFT. PUBLIC 회차도 제목 수정은 허용
+- 회차 번호: 관리자가 번호를 보내고 서버가 "마지막 + 1"인지 검사 (위반 시 409)
+- 관리자 API (2026-11-15 확정): `/api/admin/**`는 SecurityConfig에서 `hasRole("ADMIN")`. 첫 ADMIN 계정은 직접 가입 후
+  DB에서 role 변경 (role은 Access Token에 들어 있어 변경 후 재로그인/refresh 필요). 독자용 조회 API는 별도(②)로,
+  독자에게 DRAFT는 존재 자체를 숨김 (PREVIEW 노출 여부는 ② 설계 때 결정)
 - 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
@@ -146,13 +153,17 @@
   ② 단위 테스트(가짜 Repository)로는 못 잡고 실제 DB 통합 테스트로만 잡히는 버그 (트랜잭션 없으면 DB 반영 안 됨)
   ③ Access Token / Refresh Token 역할 구분과 Rotation 흐름 (`refresh` 때 옛 Refresh Token 폐기 + 새 Access·Refresh 발급)
   ④ FK `RESTRICT`가 무슨 뜻인지, 그리고 번호 건너뛰기 금지를 DB가 아니라 API에서 검사하는 이유
-- 코드 설명이 아직 안 끝남: Episode 관련 새 파일은 `EpisodeStatus` → `Episode` → V5 SQL → `EpisodeRepository` →
-  테스트 순서로 하나씩 설명하고 이해도 확인 (한꺼번에 설명 X)
-- 다음 작업: **관리자용 작품·회차 등록 API** (구현 전에 설계 방안과 변경 범위를 먼저 설명하고 승인받을 것)
-  - ADMIN 권한 검사는 SecurityConfig 변경이라 승인 필요
-  - 작품 제목·회차 제목 앞뒤 공백 trim 처리 (UNIQUE는 `"경찰"`과 `"경찰 "`을 다른 값으로 봄)
-  - 회차 등록: 번호 = 마지막 번호 + 1 검사, 동시 등록 시 UNIQUE 위반을 깔끔한 에러로 변환
-  - 회차 삭제: 마지막 회차만 허용
+- 코드 설명이 아직 안 끝남: Episode 관련 파일 중 `EpisodeStatus` → `Episode` → V5 SQL → `EpisodeRepository`는
+  2026-11-15 세션에서 설명 완료. **`EpisodeRepositoryTest`(테스트 8개) 설명만 남음** (사용자가 나중에 보기로 함).
+  한꺼번에 설명하지 말고 하나씩, 이해도 확인하며 진행
+- 진행 중: **관리자용 작품·회차 쓰기 API** (설계는 2026-11-15에 승인 완료, 위 "확정된 설계 결정" 참고)
+  - 1단계 완료: `SecurityConfig`에 `/api/admin/**` → ADMIN 규칙 + `AdminAccessIntegrationTest` 4개 (전체 42개 통과)
+    **이 코드 설명/이해도 확인(질문 2개: 401 vs 403 차이, `anyRequest()` 순서)은 아직 안 함 → 다음 세션 복습 때 확인**
+  - 2단계(다음): 작품 등록 → 수정 → 삭제 (`/api/admin/webtoons`, 제목 trim, 중복 409, 회차 0개일 때만 삭제)
+  - 3단계: 회차 등록(번호 = 마지막 + 1, 초기 DRAFT, 동시 등록 UNIQUE 위반 → 409) → 수정(제목, 상태 전환 규칙) → 삭제
+    (마지막 + PUBLIC 아님). 에러는 기존 컨벤션대로 `ResponseStatusException`
+  - 필요한 변경: `Webtoon`·`Episode` 수정용 메서드, `EpisodeRepository`에 "작품의 마지막 회차 번호 조회", `WebtoonRepository` 중복 검사
+  - 그 뒤 ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
 - 그 뒤: 이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
 - 알려진 한계/미검증: Access Token은 로그아웃 후에도 최대 1시간 유효, 실제 구글/카카오 서버 호출·브라우저 플로우는 미검증,
   JWT 필터는 보호된 실제 엔드포인트가 없어 통합 검증 못 함
