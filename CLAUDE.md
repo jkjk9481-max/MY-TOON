@@ -172,9 +172,34 @@
   - 필요한 변경: `Episode`에 상태 전환/제목 수정용 메서드, `EpisodeRepository`에 "작품의 마지막 회차 번호 조회"
   - 구현 전에 2단계처럼 API 명세(엔드포인트/DTO/에러 케이스) 먼저 제시하고 승인받기
   - 그 뒤 ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
+- 프론트엔드 다음 할 일:
+  - 오늘 만든 프론트 코드(`AuthContext`, `HeroBanner`의 타이머 리셋 로직, `index.css`의 퍼센트
+    line-height 상속 버그 등)는 아직 사용자에게 설명 안 함 → 다음 세션에 하나씩 설명
+  - Google/Kakao OAuth 앱 등록은 사용자가 직접 해야 함 (등록되면 mock 로그인을 실제 리다이렉트로 교체)
+  - `WebtoonDetailPage`/`EpisodeViewerPage`를 새 다크 테마에 맞게 톤 통일
+  - 백엔드에 독자용 조회 API가 생기면 `src/mock/data.ts`를 실제 API 호출로 교체
 - 그 뒤: 이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
 - 알려진 한계/미검증: Access Token은 로그아웃 후에도 최대 1시간 유효, 실제 구글/카카오 서버 호출·브라우저 플로우는 미검증,
   JWT 필터는 보호된 실제 엔드포인트가 없어 통합 검증 못 함
+
+## 프론트엔드 현재 상태 (2026-11-16, 신규 시작)
+- `frontend/` — Vite + React + TypeScript, 백엔드와 같은 저장소(모노레포)에 둠
+- 완료: 로그인 흐름 뼈대. `src/api/auth.ts`가 백엔드 실제 `LoginResponse` 계약에 맞춰 작성돼 있지만,
+  Google/Kakao OAuth 앱을 아직 등록 안 해서(Client ID/Secret 없음) 실제 리다이렉트는 아직 못 함.
+  대신 `AuthContext.loginMock(provider)`로 가짜 로그인 → localStorage에 저장 (나중에 실제 Client ID가
+  생기면 버튼의 리다이렉트 구성만 교체하면 되도록 설계)
+- 완료: 메인 홈페이지 구조 — `MainPage`(로그인 무관, 작품 목록) → `WebtoonDetailPage`(회차 목록, 2화부터
+  🔒) → `EpisodeViewerPage`(실제 접근 제한은 여기서 강제 — URL 직접 접근도 막힘). 비회원 1화 자유,
+  2화부터 로그인 필요라는 Phase 1 정책을 mock 데이터로 구현/검증함 (`src/mock/data.ts`, 작품 1개 회차 3개)
+- 완료: 다크 프리미엄 OTT 스타일 UI — `index.css` 다크 네이비+블루 네온 토큰, `Header`(고정/블러/
+  로그인 드롭다운/비활성 검색 아이콘), `HeroBanner`(슬라이드 배열을 받는 범용 캐러셀 — 지금은 작품이
+  1개라 자동전환·화살표·인디케이터 없이 단일 배너로만 렌더링, 작품이 늘면 코드 변경 없이 캐러셀 작동),
+  `WebtoonCard`(그리드용, 제목 2줄 말줄임)
+- 한계/미완료: 실제 커버 이미지 없어 CSS 그라데이션 placeholder만 사용 (히어로 가운데가 다소 휑함).
+  `WebtoonDetailPage`/`EpisodeViewerPage`는 아직 옛 라이트톤 인라인 스타일 그대로(이번 스코프 밖).
+  Google/Kakao OAuth 앱 등록 안 됨 (사용자가 콘솔에서 직접 해야 함, AI가 대신 못 함)
+- 검증 방법: `npm run dev` 후 Playwright로 headless 브라우저 조작 + 스크린샷 확인 (데스크톱/모바일
+  뷰포트 둘 다). 실제 사용자 브라우저로 사람이 직접 본 적은 아직 없음
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
