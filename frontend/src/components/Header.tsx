@@ -1,76 +1,82 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import './Header.css'
 
 export default function Header() {
   const { auth, loginMock, logout } = useAuth()
   const [showLoginOptions, setShowLoginOptions] = useState(false)
 
   return (
-    <header
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '16px 24px',
-        borderBottom: '1px solid var(--border)',
-      }}
-    >
-      <Link to="/" style={{ fontWeight: 700, fontSize: 20, textDecoration: 'none', color: 'inherit' }}>
-        MY TOON
-      </Link>
+    <header className="header">
+      <div className="header__inner page-container">
+        <Link to="/" className="header__logo">
+          MY-TOON
+        </Link>
 
-      {auth ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span>{auth.nickname}님</span>
-          <button type="button" onClick={() => void logout()}>
-            로그아웃
+        <nav className="header__nav">
+          <Link to="/" className="header__nav-link">
+            홈
+          </Link>
+          <a href="#explore" className="header__nav-link">
+            작품 탐색
+          </a>
+        </nav>
+
+        <div className="header__actions">
+          {/* 검색 API가 아직 없어서 자리만 잡아둔 비활성 버튼 */}
+          <button
+            type="button"
+            className="header__icon-button"
+            disabled
+            title="검색 기능은 준비 중입니다"
+            aria-label="검색 (준비 중)"
+          >
+            🔍
           </button>
-        </div>
-      ) : (
-        <div style={{ position: 'relative' }}>
-          <button type="button" onClick={() => setShowLoginOptions((v) => !v)}>
-            로그인
-          </button>
-          {showLoginOptions && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: '100%',
-                marginTop: 8,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                padding: 12,
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                borderRadius: 8,
-                zIndex: 1,
-              }}
-            >
+
+          {auth ? (
+            <div className="header__user">
+              <span>{auth.nickname}님</span>
+              <button type="button" className="header__logout-button" onClick={() => void logout()}>
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <div className="header__login-dropdown">
               <button
                 type="button"
-                onClick={() => {
-                  loginMock('google')
-                  setShowLoginOptions(false)
-                }}
+                className="header__login-button"
+                onClick={() => setShowLoginOptions((v) => !v)}
               >
-                Google로 로그인 (mock)
+                로그인
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  loginMock('kakao')
-                  setShowLoginOptions(false)
-                }}
-              >
-                Kakao로 로그인 (mock)
-              </button>
+              {showLoginOptions && (
+                <div className="header__login-options">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loginMock('google')
+                      setShowLoginOptions(false)
+                    }}
+                  >
+                    Google로 로그인 (mock)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loginMock('kakao')
+                      setShowLoginOptions(false)
+                    }}
+                  >
+                    Kakao로 로그인 (mock)
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </header>
   )
 }

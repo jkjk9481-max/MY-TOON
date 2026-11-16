@@ -1,0 +1,38 @@
+.webtoon-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+}
+
+.webtoon-card__cover {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease;
+}
+
+.webtoon-card:hover .webtoon-card__cover {
+  transform: translateY(-4px);
+}
+
+.webtoon-card__title {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.webtoon-card__author {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text);
+}

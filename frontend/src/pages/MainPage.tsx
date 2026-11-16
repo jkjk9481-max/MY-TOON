@@ -1,28 +1,58 @@
 import { Link } from 'react-router-dom'
-import { mockWebtoon } from '../mock/data'
+import HeroBanner from '../components/HeroBanner'
+import WebtoonCard from '../components/WebtoonCard'
+import { useAuth } from '../auth/AuthContext'
+import { heroSlides, mockWebtoon } from '../mock/data'
+import './MainPage.css'
 
-// 로그인 여부와 상관없이 누구나 볼 수 있는 메인 화면 (작품 목록).
 export default function MainPage() {
-  return (
-    <section style={{ maxWidth: 600, margin: '40px auto', padding: '0 16px' }}>
-      <h1 style={{ fontSize: 28 }}>작품 목록</h1>
+  const { auth } = useAuth()
 
-      <Link
-        to={`/webtoons/${mockWebtoon.id}`}
-        style={{
-          display: 'block',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          padding: 16,
-          marginTop: 16,
-          textDecoration: 'none',
-          color: 'inherit',
-        }}
-      >
-        <h2 style={{ fontSize: 20, margin: 0 }}>{mockWebtoon.title}</h2>
-        <p style={{ color: '#666', margin: '8px 0 0' }}>{mockWebtoon.authorName}</p>
-        <p style={{ color: '#666', margin: '4px 0 0', fontSize: 14 }}>{mockWebtoon.description}</p>
-      </Link>
-    </section>
+  const slides = heroSlides.map((webtoon) => ({
+    id: webtoon.id,
+    title: webtoon.title,
+    description: webtoon.description,
+    coverGradient: webtoon.coverGradient,
+    viewHref: `/webtoons/${webtoon.id}/episodes/${webtoon.episodes[0].episodeNumber}`,
+    detailHref: `/webtoons/${webtoon.id}`,
+  }))
+
+  return (
+    <>
+      <HeroBanner slides={slides} />
+
+      <div className="page-container">
+        <section className="main-section">
+          <h2 className="main-section__title">최신 업데이트 회차</h2>
+          <div className="episode-row">
+            {mockWebtoon.episodes.map((episode) => {
+              const requiresLogin = episode.episodeNumber >= 2 && !auth
+              return (
+                <Link
+                  key={episode.episodeNumber}
+                  to={`/webtoons/${mockWebtoon.id}/episodes/${episode.episodeNumber}`}
+                  className="episode-row__item"
+                >
+                  <span>{episode.title}</span>
+                  {requiresLogin && <span className="episode-row__lock">🔒 로그인 필요</span>}
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+
+        <section id="explore" className="main-section">
+          <h2 className="main-section__title">작품 탐색</h2>
+          <div className="webtoon-grid">
+            <WebtoonCard
+              id={mockWebtoon.id}
+              title={mockWebtoon.title}
+              authorName={mockWebtoon.authorName}
+              coverGradient={mockWebtoon.coverGradient}
+            />
+          </div>
+        </section>
+      </div>
+    </>
   )
 }

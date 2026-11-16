@@ -1,0 +1,50 @@
+.main-section {
+  padding: 48px 0;
+}
+
+.main-section__title {
+  margin-bottom: 20px;
+}
+
+.episode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.episode-row__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--surface);
+  text-decoration: none;
+  color: var(--text-h);
+  font-size: 15px;
+  transition: background 0.15s ease;
+}
+
+.episode-row__item:hover {
+  background: #171f38;
+}
+
+.episode-row__lock {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.webtoon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 480px) {
+  .webtoon-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+}
