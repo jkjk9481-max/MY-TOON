@@ -97,7 +97,7 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-15 기준)
+## 현재 상태 / 다음 할 일 (2026-11-16 기준)
 - 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2·V3 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
@@ -120,12 +120,19 @@
 - 완료: Webtoon 엔티티 + V4 마이그레이션 + `WebtoonRepository` (패키지 `com.mytoon.backend.webtoon.{entity, repository}`).
   컬럼은 title(UNIQUE, 100자) / description(TEXT, NULL 허용) / author_name(50자) / created_at 만 있음.
   작가는 별도 테이블 없이 문자열로 저장(본인 작품 중심이라서, 다른 작가 등록 시점에 분리 검토).
-  실제 Postgres 테스트로 UNIQUE·NOT NULL 검증. 관리자 등록 API는 아직 없음
+  실제 Postgres 테스트로 UNIQUE·NOT NULL 검증. 관리자 등록 API는 아래 참고
 - 완료: Episode 엔티티 + V5 마이그레이션 + `EpisodeRepository` + `EpisodeStatus`(DRAFT/PREVIEW/PUBLIC) (2026-11-15, 커밋 4b49ad3).
   컬럼: webtoon_id(FK) / episode_number(INT, 1 이상) / title(100자) / status / created_at. 삭제 컬럼 없음.
   제약: `(webtoon_id, episode_number)` UNIQUE, `(webtoon_id, title)` UNIQUE, 번호 CHECK ≥ 1, 상태 CHECK,
   FK `ON DELETE RESTRICT`(회차가 남은 작품은 삭제 불가). 실제 Postgres 테스트 8개로 검증. 관리자 API는 아직 없음
-- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 38개 통과 확인)
+- 완료: 관리자용 작품(Webtoon) 쓰기 API — `POST/PATCH/DELETE /api/admin/webtoons(/{id})` (2026-11-16).
+  `Webtoon`에 `updateTitle/updateDescription/updateAuthorName` 메서드 추가, 신규 `WebtoonService`(create/update/delete)
+  + `AdminWebtoonController`. 제목은 trim 후 저장, 중복이면 409(서비스에서 선제 체크 + DB UNIQUE가 최후 방어선),
+  존재하지 않는 id는 404, 회차가 하나라도 남아있으면 삭제 거절 409(DB FK RESTRICT가 최후 방어선).
+  PATCH는 부분 수정(보낸 필드만 반영, null은 "변경 안 함" — description을 명시적으로 지우는 기능은 아직 없음).
+  실제 Postgres 통합 테스트(`AdminWebtoonControllerIntegrationTest`) 8개로 검증
+- 완료: `AdminAccessIntegrationTest`(401 vs 403 차이, `anyRequest()` 순서) + 위 신규 코드 전체 설명/이해도 확인 (2026-11-16)
+- 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 50개 통과 확인, 2026-11-16)
 
 ## 확정된 설계 결정 (Episode, 2026-11-15)
 - 회차 번호: 작품 안에서 유일, 1부터 시작, **건너뛰기 금지** (DB 제약으로는 못 막으므로 관리자 API에서
@@ -148,21 +155,22 @@
 - 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
-- 복습 퀴즈 후보 (지난 세션에서 헷갈려 했던 것 위주로 다시):
-  ① `logout`은 폐기된 토큰이 와도 조용히 204, `refresh`는 전체 폐기하는 이유 (정상 상황 vs 탈취 의심)
-  ② 단위 테스트(가짜 Repository)로는 못 잡고 실제 DB 통합 테스트로만 잡히는 버그 (트랜잭션 없으면 DB 반영 안 됨)
-  ③ Access Token / Refresh Token 역할 구분과 Rotation 흐름 (`refresh` 때 옛 Refresh Token 폐기 + 새 Access·Refresh 발급)
-  ④ FK `RESTRICT`가 무슨 뜻인지, 그리고 번호 건너뛰기 금지를 DB가 아니라 API에서 검사하는 이유
-- 코드 설명이 아직 안 끝남: Episode 관련 파일 중 `EpisodeStatus` → `Episode` → V5 SQL → `EpisodeRepository`는
-  2026-11-15 세션에서 설명 완료. **`EpisodeRepositoryTest`(테스트 8개) 설명만 남음** (사용자가 나중에 보기로 함).
+- 복습 퀴즈 후보 (2026-11-16에 다룬 것 중 다시 헷갈릴 만한 부분 위주):
+  ① `WebtoonService.update()`는 왜 `AuthService.refresh()`와 달리 `noRollbackFor` 없이 평범한
+     `@Transactional`만 써도 되는지 (예외 전에 일부 필드만 바뀐 상태가 "그대로 롤백되는 게 맞는" 이유)
+  ② 회차 "번호 건너뛰기 금지"는 **관리자가 등록할 때**의 규칙이고, 독자가 회차를 건너뛰어 보는 것과는
+     무관하다는 것 (독자 순차 열람 제한은 아직 없는 기능, Phase 3 "순차 단서 수집"과 헷갈리지 않기)
+  ③ `ON DELETE RESTRICT`는 "자식 행이 남아있으면 부모 행 삭제를 거절"한다는 뜻 (회차가 남은 작품은 못 지움)
+  ④ (이전 세션 복습, 재확인됨) refresh의 탈취 감지 전체 폐기 vs logout의 멱등 처리 차이
+- 코드 설명이 아직 안 끝남: **`EpisodeRepositoryTest`(테스트 8개) 설명만 남음** (사용자가 나중에 보기로 함).
   한꺼번에 설명하지 말고 하나씩, 이해도 확인하며 진행
-- 진행 중: **관리자용 작품·회차 쓰기 API** (설계는 2026-11-15에 승인 완료, 위 "확정된 설계 결정" 참고)
-  - 1단계 완료: `SecurityConfig`에 `/api/admin/**` → ADMIN 규칙 + `AdminAccessIntegrationTest` 4개 (전체 42개 통과)
-    **이 코드 설명/이해도 확인(질문 2개: 401 vs 403 차이, `anyRequest()` 순서)은 아직 안 함 → 다음 세션 복습 때 확인**
-  - 2단계(다음): 작품 등록 → 수정 → 삭제 (`/api/admin/webtoons`, 제목 trim, 중복 409, 회차 0개일 때만 삭제)
-  - 3단계: 회차 등록(번호 = 마지막 + 1, 초기 DRAFT, 동시 등록 UNIQUE 위반 → 409) → 수정(제목, 상태 전환 규칙) → 삭제
-    (마지막 + PUBLIC 아님). 에러는 기존 컨벤션대로 `ResponseStatusException`
-  - 필요한 변경: `Webtoon`·`Episode` 수정용 메서드, `EpisodeRepository`에 "작품의 마지막 회차 번호 조회", `WebtoonRepository` 중복 검사
+- 완료: **관리자용 작품(Webtoon) 쓰기 API** 1~2단계 전부 (설계 2026-11-15 승인, 구현/테스트/코드 설명 2026-11-16 완료)
+  - 1단계: `SecurityConfig` ADMIN 규칙 + `AdminAccessIntegrationTest` (코드 설명도 2026-11-16에 완료)
+  - 2단계: 작품 등록/수정/삭제 `WebtoonService` + `AdminWebtoonController` + 통합 테스트 8개 (코드 설명 완료)
+- 다음(3단계): 회차 등록(번호 = 마지막 + 1, 초기 DRAFT, 동시 등록 UNIQUE 위반 → 409) → 수정(제목, 상태 전환 규칙) → 삭제
+  (마지막 + PUBLIC 아님). 에러는 기존 컨벤션대로 `ResponseStatusException`
+  - 필요한 변경: `Episode`에 상태 전환/제목 수정용 메서드, `EpisodeRepository`에 "작품의 마지막 회차 번호 조회"
+  - 구현 전에 2단계처럼 API 명세(엔드포인트/DTO/에러 케이스) 먼저 제시하고 승인받기
   - 그 뒤 ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
 - 그 뒤: 이미지 업로드, 뷰어, 접근 권한(비회원 1화까지)
 - 알려진 한계/미검증: Access Token은 로그아웃 후에도 최대 1시간 유효, 실제 구글/카카오 서버 호출·브라우저 플로우는 미검증,
@@ -170,7 +178,7 @@
 
 ## 코드 구조
 - 패키지: `com.mytoon.backend.user.{controller, controller.dto, service, entity, repository}` (계층별 분리)
-- `com.mytoon.backend.webtoon.{entity, repository}` — 작품(Webtoon)과 회차(Episode, EpisodeStatus)
+- `com.mytoon.backend.webtoon.{entity, repository, service, controller, controller.dto}` — 작품(Webtoon)과 회차(Episode, EpisodeStatus)
 - `com.mytoon.backend.oauth` — 구글/카카오 등 외부 OAuth2 프로바이더 연동 전담 (user 도메인이 아니라
   최상위 패키지로 분리: OAuth2 클라이언트는 user의 비즈니스 로직이 아니라 외부 API 연동/인프라 성격이라서)
 - `com.mytoon.backend.config` — SecurityConfig, RestClientConfig 등 전역 설정
