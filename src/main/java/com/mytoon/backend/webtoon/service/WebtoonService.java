@@ -64,9 +64,9 @@ public class WebtoonService {
 
     @Transactional
     public void delete(Long id) {
-        Webtoon webtoon = findOrThrow(id);
+        Webtoon webtoon = findOrThrow(id); // 작품이 없으면 404
 
-        if (episodeRepository.existsByWebtoonId(id)) {
+        if (episodeRepository.existsByWebtoonId(id)) { // 작품은 있는데 회차가 남아있으면 409
             throw new ResponseStatusException(HttpStatus.CONFLICT, "회차가 남아있는 작품은 삭제할 수 없습니다.");
         }
 
