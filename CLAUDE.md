@@ -156,7 +156,7 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-16 기준)
+## 현재 상태 / 다음 할 일 (2026-11-17 기준)
 - 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2·V3 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
@@ -183,7 +183,7 @@
 - 완료: Episode 엔티티 + V5 마이그레이션 + `EpisodeRepository` + `EpisodeStatus`(DRAFT/PREVIEW/PUBLIC) (2026-11-15, 커밋 4b49ad3).
   컬럼: webtoon_id(FK) / episode_number(INT, 1 이상) / title(100자) / status / created_at. 삭제 컬럼 없음.
   제약: `(webtoon_id, episode_number)` UNIQUE, `(webtoon_id, title)` UNIQUE, 번호 CHECK ≥ 1, 상태 CHECK,
-  FK `ON DELETE RESTRICT`(회차가 남은 작품은 삭제 불가). 실제 Postgres 테스트 8개로 검증. 관리자 API는 아직 없음
+  FK `ON DELETE RESTRICT`(회차가 남은 작품은 삭제 불가). 실제 Postgres 테스트 8개로 검증. 관리자 API는 아래 참고
 - 완료: 관리자용 작품(Webtoon) 쓰기 API — `POST/PATCH/DELETE /api/admin/webtoons(/{id})` (2026-11-16).
   `Webtoon`에 `updateTitle/updateDescription/updateAuthorName` 메서드 추가, 신규 `WebtoonService`(create/update/delete)
   + `AdminWebtoonController`. 제목은 trim 후 저장, 중복이면 409(서비스에서 선제 체크 + DB UNIQUE가 최후 방어선),
@@ -192,6 +192,23 @@
   실제 Postgres 통합 테스트(`AdminWebtoonControllerIntegrationTest`) 8개로 검증
 - 완료: `AdminAccessIntegrationTest`(401 vs 403 차이, `anyRequest()` 순서) + 위 신규 코드 전체 설명/이해도 확인 (2026-11-16)
 - 테스트 실행 전제: 로컬 Postgres의 `mytoon` DB 필요, `JWT_SECRET` 환경변수 필요 (전체 50개 통과 확인, 2026-11-16)
+- 완료: 관리자용 회차(Episode) 등록 API — `POST /api/admin/webtoons/{webtoonId}/episodes` (2026-11-17, 커밋 7d2c262).
+  `EpisodeRepository`에 `findMaxEpisodeNumberByWebtoonId`(`COALESCE(MAX(...), 0)`로 회차 없으면 0),
+  `existsByWebtoonIdAndTitle` 추가. 신규 `EpisodeService.create()` + `AdminEpisodeController`.
+  요청 번호가 "마지막 회차 번호 + 1"이 아니면 409("다음 회차 번호는 N입니다"), 같은 작품 내 제목 중복 409,
+  작품 없으면 404, 제목 공백 400, 새 회차는 항상 DRAFT로 시작. 실제 Postgres 통합 테스트
+  (`AdminEpisodeControllerIntegrationTest`) 7개로 검증. 동시 등록 레이스는 `EpisodeRepositoryTest`의
+  DB UNIQUE 검증에 의존(API 레벨 동시성 테스트는 아직 없음 — 레이스 패자가 409가 아니라 500을 받을 수 있다는
+  게 코드 리딩으로만 확인된 추정, 실제 테스트로 검증 안 됨)
+- 완료(부분): `EpisodeService.updateTitle()` — `Episode.updateTitle()`, `EpisodeRepository
+  .existsByWebtoonIdAndTitleAndIdNot()`(자기 자신 제외 중복 체크) 추가 (2026-11-17, 커밋 44bef87, 사용자가
+  독립 과제로 직접 작성 — 중복 체크 결과를 버리는 버그, trim 안 된 값을 저장하는 버그를 스스로 찾아 수정).
+  **PATCH Controller가 아직 없어서 API로 호출 불가, 통합 테스트도 없음** — 다음 세션에서 이어서 진행
+- 완료: CLAUDE.md 작업 지침 전면 개정 (2026-11-17, 커밋 5c22b5a) — "AI 협업 및 백엔드 개발 역량 성장 지침"으로
+  교체 (0~10번 + 최종 협업 원칙). 핵심: 프로젝트 완성 속도보다 개발 역량 성장이 최우선, 핵심 기능마다
+  AI 도움 없는 독립 과제 필수, 기능 완료와 학습 완료를 분리 평가. 이 지침에 따라 오늘 Episode 등록 API부터
+  요구사항 분석(사용자가 먼저 엔드포인트/필드/에러케이스 제안) → 설계 승인 → 구현 → 코드 설명(1개씩) →
+  이해도 퀴즈(점수제) → 독립 과제(`updateTitle`) 순서로 실제 적용함
 
 ## 확정된 설계 결정 (Episode, 2026-11-15)
 - 회차 번호: 작품 안에서 유일, 1부터 시작, **건너뛰기 금지** (DB 제약으로는 못 막으므로 관리자 API에서
@@ -214,23 +231,29 @@
 - 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
-- 복습 퀴즈 후보 (2026-11-16에 다룬 것 중 다시 헷갈릴 만한 부분 위주):
-  ① `WebtoonService.update()`는 왜 `AuthService.refresh()`와 달리 `noRollbackFor` 없이 평범한
-     `@Transactional`만 써도 되는지 (예외 전에 일부 필드만 바뀐 상태가 "그대로 롤백되는 게 맞는" 이유)
-  ② 회차 "번호 건너뛰기 금지"는 **관리자가 등록할 때**의 규칙이고, 독자가 회차를 건너뛰어 보는 것과는
-     무관하다는 것 (독자 순차 열람 제한은 아직 없는 기능, Phase 3 "순차 단서 수집"과 헷갈리지 않기)
-  ③ `ON DELETE RESTRICT`는 "자식 행이 남아있으면 부모 행 삭제를 거절"한다는 뜻 (회차가 남은 작품은 못 지움)
-  ④ (이전 세션 복습, 재확인됨) refresh의 탈취 감지 전체 폐기 vs logout의 멱등 처리 차이
-- 코드 설명이 아직 안 끝남: **`EpisodeRepositoryTest`(테스트 8개) 설명만 남음** (사용자가 나중에 보기로 함).
-  한꺼번에 설명하지 말고 하나씩, 이해도 확인하며 진행
-- 완료: **관리자용 작품(Webtoon) 쓰기 API** 1~2단계 전부 (설계 2026-11-15 승인, 구현/테스트/코드 설명 2026-11-16 완료)
-  - 1단계: `SecurityConfig` ADMIN 규칙 + `AdminAccessIntegrationTest` (코드 설명도 2026-11-16에 완료)
-  - 2단계: 작품 등록/수정/삭제 `WebtoonService` + `AdminWebtoonController` + 통합 테스트 8개 (코드 설명 완료)
-- 다음(3단계): 회차 등록(번호 = 마지막 + 1, 초기 DRAFT, 동시 등록 UNIQUE 위반 → 409) → 수정(제목, 상태 전환 규칙) → 삭제
-  (마지막 + PUBLIC 아님). 에러는 기존 컨벤션대로 `ResponseStatusException`
-  - 필요한 변경: `Episode`에 상태 전환/제목 수정용 메서드, `EpisodeRepository`에 "작품의 마지막 회차 번호 조회"
-  - 구현 전에 2단계처럼 API 명세(엔드포인트/DTO/에러 케이스) 먼저 제시하고 승인받기
+- 복습 퀴즈 후보 (2026-11-17에 다룬 것 중 다시 헷갈릴 만한 부분 위주, 특히 ①②는 이번에 여러 번 헷갈렸던 지점):
+  ① 404 vs 409 구분 — "작품 자체가 없음"(404, `findOrThrow`)과 "작품은 있는데 지금 상태로는 안 됨"(409,
+     `existsBy...` 체크)이 `WebtoonService.delete()`/`EpisodeService.create()` 안에서 서로 다른 코드 줄이라는 것.
+     처음엔 두 체크를 섞어서 "작품이 존재하는지 DB에서 확인"이라고만 답했던 지점 — 다시 확인 필요
+  ② `noRollbackFor(ResponseStatusException.class)`는 그 메서드 안의 **모든** `ResponseStatusException` 지점에
+     동시에 적용된다는 것 (한 줄만 골라서 적용되는 게 아님) — `AuthService.refresh()`는 그래도 안전한 이유(예외
+     던지기 전에 의도된 side-effect만 있어서)까지 설명 다시 확인
+  ③ `COALESCE(MAX(e.episodeNumber), 0)`에서 0이 나오는 조건은 "작품이 없음"이 아니라 "**그 작품에 회차가
+     아직 없음**"이라는 것 (작품 자체가 없으면 이 쿼리까지 오기 전에 이미 404로 끝남)
+  ④ (이전 세션 복습, 재확인됨) `WebtoonService.update()`는 왜 `noRollbackFor` 없이 평범한 `@Transactional`만
+     써도 되는지, `ON DELETE RESTRICT`의 의미
+- 코드 설명이 아직 안 끝남: **`EpisodeRepositoryTest`(테스트 8개) 설명만 계속 남음** (사용자가 나중에 보기로 함)
+- 완료: **관리자용 작품(Webtoon) 쓰기 API** 1~2단계, **회차 등록 API**(3단계 전반부) — 설계 승인 → 구현 →
+  테스트 → 코드 설명(클래스 1개씩) → 이해도 퀴즈까지 전부 끝남. 구체적인 내용은 위 "현재 상태" 참고
+- 진행 중(3단계 후반부): `EpisodeService.updateTitle()`은 로직만 있고 **Controller 연결 전** (사용자가
+  독립 과제로 작성, 코드 설명까지 끝남). 다음 세션에서:
+  1. `AdminEpisodeController`에 `PATCH /api/admin/webtoons/{webtoonId}/episodes/{episodeId}` 추가
+     (엔드포인트 경로는 제안만 해본 것이라 시작할 때 다시 확인/승인받기)
+  2. 통합 테스트 작성 (제목 중복 409 포함, 특히 "자기 자신과 비교해서 가짜 중복이 뜨지 않는지" 케이스)
+  3. 그 다음: 상태 전환(DRAFT→PREVIEW→PUBLIC, 뒤로 이동 금지, 409) → 삭제(마지막 + PUBLIC 아닐 때만)
   - 그 뒤 ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
+- 알려진 추정(미검증): 회차 등록 동시성 레이스에서 패자가 409가 아니라 500을 받을 수 있음 (코드 리딩 추정,
+  실제 멀티스레드 테스트로 확인 안 함 — `WebtoonService.create()`에도 동일하게 있는 기존 한계)
 - 프론트엔드 다음 할 일:
   - 오늘 만든 프론트 코드(`AuthContext`, `HeroBanner`의 타이머 리셋 로직, `index.css`의 퍼센트
     line-height 상속 버그 등)는 아직 사용자에게 설명 안 함 → 다음 세션에 하나씩 설명
