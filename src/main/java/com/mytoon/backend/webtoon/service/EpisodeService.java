@@ -32,7 +32,7 @@ public class EpisodeService {
         if (request.episodeNumber() != expectedNumber) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "회차 번호는 마지막 회차 번호 + 1(" + expectedNumber + ")이어야 합니다.");
+                    "다음 회차 번호는 " + expectedNumber + "입니다.");
         }
 
         if (episodeRepository.existsByWebtoonIdAndTitle(webtoonId, title)) {
@@ -44,7 +44,7 @@ public class EpisodeService {
                         .webtoon(webtoon)
                         .episodeNumber(request.episodeNumber())
                         .title(title)
-                        .status(EpisodeStatus.DRAFT)
+                        .status(EpisodeStatus.DRAFT) //새 회차는 항상 DRAFT로 시작
                         .build()
         );
     }
@@ -55,5 +55,21 @@ public class EpisodeService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은(는) 비어있을 수 없습니다.");
         }
         return trimmed;
+    }
+
+    @Transactional
+    public Episode updateTitle(Long episodeId, String newTitle) {
+        Episode episode = episodeRepository.findById(episodeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND , "존재하지 않는 회차입니다."));
+
+        String title = requireNonBlank(newTitle, "newTitle");
+
+        if(episodeRepository.existsByWebtoonIdAndTitleAndIdNot(episode.getWebtoon().getId(), title, episodeId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT , "같은 작품에 이미 존재하는 회차 제목입니다.");
+        }
+
+        episode.updateTitle(title);
+
+        return episodeRepository.save(episode);
     }
 }

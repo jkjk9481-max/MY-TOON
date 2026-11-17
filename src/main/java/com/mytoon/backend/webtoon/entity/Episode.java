@@ -64,4 +64,11 @@ public class Episode {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+
+    public void updateTitle(String title){
+        this.title = title;
+    }
+
+
 }

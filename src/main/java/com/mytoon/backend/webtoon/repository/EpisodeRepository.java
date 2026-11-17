@@ -15,4 +15,8 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     // 아직 회차가 하나도 없으면 0을 돌려줘서, 호출하는 쪽에서 "마지막 번호 + 1 = 1"이 자연스럽게 맞게 한다.
     @Query("SELECT COALESCE(MAX(e.episodeNumber), 0) FROM Episode e WHERE e.webtoon.id = :webtoonId")
     int findMaxEpisodeNumberByWebtoonId(@Param("webtoonId") Long webtoonId);
+
+
+    // 자기 자신을 제외하고 비교
+    boolean existsByWebtoonIdAndTitleAndIdNot(Long webtoonId , String title, Long id);
 }
