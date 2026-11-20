@@ -58,9 +58,11 @@ public class EpisodeService {
     }
 
     @Transactional
-    public Episode updateTitle(Long episodeId, String newTitle) {
-        Episode episode = episodeRepository.findById(episodeId)
+    public Episode updateTitle(Long webtoonId, Long episodeId, String newTitle) {
+
+        Episode episode = episodeRepository.findByIdAndWebtoonId(episodeId, webtoonId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND , "존재하지 않는 회차입니다."));
+
 
         String title = requireNonBlank(newTitle, "newTitle");
 

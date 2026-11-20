@@ -6,6 +6,8 @@ import org.springframework.data.repository.query.Param;
 
 import com.mytoon.backend.webtoon.entity.Episode;
 
+import java.util.Optional;
+
 public interface EpisodeRepository extends JpaRepository<Episode, Long> {
 
     boolean existsByWebtoonId(Long webtoonId);
@@ -19,4 +21,8 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
 
     // 자기 자신을 제외하고 비교
     boolean existsByWebtoonIdAndTitleAndIdNot(Long webtoonId , String title, Long id);
+
+
+    // Optional -> 이 값은 없을수도있다
+    Optional<Episode> findByIdAndWebtoonId(Long episodeId , Long webtoonId);
 }
