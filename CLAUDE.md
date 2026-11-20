@@ -203,7 +203,12 @@
 - 완료(부분): `EpisodeService.updateTitle()` — `Episode.updateTitle()`, `EpisodeRepository
   .existsByWebtoonIdAndTitleAndIdNot()`(자기 자신 제외 중복 체크) 추가 (2026-11-17, 커밋 44bef87, 사용자가
   독립 과제로 직접 작성 — 중복 체크 결과를 버리는 버그, trim 안 된 값을 저장하는 버그를 스스로 찾아 수정).
-  **PATCH Controller가 아직 없어서 API로 호출 불가, 통합 테스트도 없음** — 다음 세션에서 이어서 진행
+  → 이후 PATCH Controller 연결됨(커밋 f99af9f), 통합 테스트 7개 추가(2026-11-21, 커밋 c741e38)
+- 완료: 회차 상태 전환 API (2026-11-21, 커밋 3dec354) — `PATCH /api/admin/webtoons/{webtoonId}/episodes/{episodeId}/status`
+  (body `{"status":"PREVIEW"}`, 제목 수정과 분리한 전용 엔드포인트). `EpisodeStatus.canMoveTo()`가 선언 순서(ordinal)로
+  "앞으로만" 판단(DRAFT→PREVIEW→PUBLIC, DRAFT→PUBLIC 허용). 뒤로 이동·**같은 상태 요청도 409**(관리자 실수를
+  조용히 넘기지 않기 위해, 사용자 결정), 회차 없음/다른 작품 소속 404, status 누락·없는 값 400. 통합 테스트 10개,
+  전체 74개 통과. 한계: 규칙이 서비스에만 있고 `Episode.updateStatus()`는 검사 없음, enum 순서에 의존
 - 완료: CLAUDE.md 작업 지침 전면 개정 (2026-11-17, 커밋 5c22b5a) — "AI 협업 및 백엔드 개발 역량 성장 지침"으로
   교체 (0~10번 + 최종 협업 원칙). 핵심: 프로젝트 완성 속도보다 개발 역량 성장이 최우선, 핵심 기능마다
   AI 도움 없는 독립 과제 필수, 기능 완료와 학습 완료를 분리 평가. 이 지침에 따라 오늘 Episode 등록 API부터
@@ -251,13 +256,16 @@
 - 코드 설명이 아직 안 끝남: **`EpisodeRepositoryTest`(테스트 8개) 설명만 계속 남음** (사용자가 나중에 보기로 함)
 - 완료: **관리자용 작품(Webtoon) 쓰기 API** 1~2단계, **회차 등록 API**(3단계 전반부) — 설계 승인 → 구현 →
   테스트 → 코드 설명(클래스 1개씩) → 이해도 퀴즈까지 전부 끝남. 구체적인 내용은 위 "현재 상태" 참고
-- 진행 중(3단계 후반부): `EpisodeService.updateTitle()`은 로직만 있고 **Controller 연결 전** (사용자가
-  독립 과제로 작성, 코드 설명까지 끝남). 다음 세션에서:
-  1. `AdminEpisodeController`에 `PATCH /api/admin/webtoons/{webtoonId}/episodes/{episodeId}` 추가
-     (엔드포인트 경로는 제안만 해본 것이라 시작할 때 다시 확인/승인받기)
-  2. 통합 테스트 작성 (제목 중복 409 포함, 특히 "자기 자신과 비교해서 가짜 중복이 뜨지 않는지" 케이스)
-  3. 그 다음: 상태 전환(DRAFT→PREVIEW→PUBLIC, 뒤로 이동 금지, 409) → 삭제(마지막 + PUBLIC 아닐 때만)
-  - 그 뒤 ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
+- 2026-11-21 세션 결과: PATCH 제목 수정 테스트 + 상태 전환 API 완료, 코드 설명 5개 클래스 끝남.
+  - 이해도: `AndIdNot`(자기 자신 제외 중복 검사)·400 vs 409 구분·검사 후 저장 순서는 이해함.
+    **`@Valid` 역할은 보충 필요**(지우면 `{}` 요청이 400이 아니라 NPE→500이 날 것이라는 점을 틀림,
+    코드 리딩 추정이며 실제로 지워서 실행해 확인하진 않음 → 직접 실험 권장)
+  - **미완 독립 과제**: "DRAFT→PUBLIC 직행 금지, PREVIEW 필수"로 요구사항이 바뀌면 어디를 고치고 어떤 테스트가
+    깨지고 무엇을 추가할지 (아직 시도 안 함)
+  - 다음 할 일: 회차 삭제(마지막 회차 + PUBLIC 아닐 때만) → ②독자용 조회 API
+    (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
+  - 보류 중인 최우선 항목: 위의 `AuthService.refresh()`/`noRollbackFor` 정리 (2026-11-21에 사용자가 진도를 먼저
+    나가자고 해서 미룸, 여전히 미해결)
 - 알려진 추정(미검증): 회차 등록 동시성 레이스에서 패자가 409가 아니라 500을 받을 수 있음 (코드 리딩 추정,
   실제 멀티스레드 테스트로 확인 안 함 — `WebtoonService.create()`에도 동일하게 있는 기존 한계)
 - 프론트엔드 다음 할 일:
