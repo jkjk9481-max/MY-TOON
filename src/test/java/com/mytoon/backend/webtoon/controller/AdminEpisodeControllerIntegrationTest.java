@@ -243,4 +243,119 @@ class AdminEpisodeControllerIntegrationTest {
         patchTitle(webtoon.getId(), ep.getId(), "   ")
                 .andExpect(status().isBadRequest());
     }
+
+    private Episode newEpisodeWithStatus(Webtoon webtoon, int number, String title, EpisodeStatus status) {
+        return episodeRepository.save(Episode.builder()
+                .webtoon(webtoon).episodeNumber(number).title(title).status(status).build());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchStatus(Long webtoonId, Long episodeId, String body) throws Exception {
+        return mockMvc.perform(patch("/api/admin/webtoons/" + webtoonId + "/episodes/" + episodeId + "/status")
+                .header("Authorization", adminAuthHeader())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body));
+    }
+
+    @Test
+    @DisplayName("DRAFT -> PREVIEW 는 200")
+    void updateStatus_draftToPreview_returns200() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"PREVIEW\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PREVIEW"));
+    }
+
+    @Test
+    @DisplayName("PREVIEW -> PUBLIC 은 200")
+    void updateStatus_previewToPublic_returns200() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisodeWithStatus(webtoon, 1, "프롤로그", EpisodeStatus.PREVIEW);
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"PUBLIC\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLIC"));
+    }
+
+    @Test
+    @DisplayName("DRAFT -> PUBLIC 직행도 200")
+    void updateStatus_draftToPublic_returns200() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"PUBLIC\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLIC"));
+    }
+
+    @Test
+    @DisplayName("PREVIEW -> DRAFT 처럼 뒤로 가면 409")
+    void updateStatus_backward_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisodeWithStatus(webtoon, 1, "프롤로그", EpisodeStatus.PREVIEW);
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"DRAFT\"}")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("PUBLIC -> PREVIEW 도 409")
+    void updateStatus_publicToPreview_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisodeWithStatus(webtoon, 1, "프롤로그", EpisodeStatus.PUBLIC);
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"PREVIEW\"}")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("같은 상태로 요청하면 409 (관리자 실수를 알려준다)")
+    void updateStatus_sameStatus_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisodeWithStatus(webtoon, 1, "프롤로그", EpisodeStatus.PREVIEW);
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"PREVIEW\"}")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("없는 회차는 404")
+    void updateStatus_episodeNotFound_returns404() throws Exception {
+        Webtoon webtoon = newWebtoon();
+
+        patchStatus(webtoon.getId(), 0L, "{\"status\":\"PREVIEW\"}")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("다른 작품 소속 회차는 404")
+    void updateStatus_episodeOfOtherWebtoon_returns404() throws Exception {
+        Webtoon webtoonA = newWebtoon();
+        Webtoon webtoonB = newWebtoon();
+        Episode epOfA = newEpisode(webtoonA, 1, "프롤로그");
+
+        patchStatus(webtoonB.getId(), epOfA.getId(), "{\"status\":\"PREVIEW\"}")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("status 값이 없으면 400")
+    void updateStatus_missingStatus_returns400() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchStatus(webtoon.getId(), ep.getId(), "{}")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 status 값이면 400")
+    void updateStatus_unknownStatus_returns400() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"HIDDEN\"}")
+                .andExpect(status().isBadRequest());
+    }
 }

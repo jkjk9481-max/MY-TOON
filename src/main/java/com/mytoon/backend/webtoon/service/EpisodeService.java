@@ -74,4 +74,19 @@ public class EpisodeService {
 
         return episodeRepository.save(episode);
     }
+
+    @Transactional
+    public Episode updateStatus(Long webtoonId, Long episodeId, EpisodeStatus newStatus) {
+        Episode episode = episodeRepository.findByIdAndWebtoonId(episodeId, webtoonId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 회차입니다."));
+
+        if (!episode.getStatus().canMoveTo(newStatus)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    episode.getStatus() + "에서 " + newStatus + "(으)로는 변경할 수 없습니다.");
+        }
+
+        episode.updateStatus(newStatus);
+        return episodeRepository.save(episode);
+    }
 }

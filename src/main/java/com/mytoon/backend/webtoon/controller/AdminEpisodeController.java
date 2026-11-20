@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.mytoon.backend.webtoon.controller.dto.EpisodeCreateRequest;
 import com.mytoon.backend.webtoon.controller.dto.EpisodeResponse;
+import com.mytoon.backend.webtoon.controller.dto.EpisodeStatusUpdateRequest;
 import com.mytoon.backend.webtoon.controller.dto.EpisodeTitleUpdateRequest;
 import com.mytoon.backend.webtoon.entity.Episode;
 import com.mytoon.backend.webtoon.service.EpisodeService;
@@ -38,6 +39,15 @@ public class AdminEpisodeController {
             @PathVariable Long episodeId,
             @Valid @RequestBody EpisodeTitleUpdateRequest request) {
         Episode episode = episodeService.updateTitle(webtoonId, episodeId, request.title());
+        return EpisodeResponse.from(episode);
+    }
+
+    @PatchMapping("/{episodeId}/status")
+    public EpisodeResponse updateStatus(
+            @PathVariable Long webtoonId,
+            @PathVariable Long episodeId,
+            @Valid @RequestBody EpisodeStatusUpdateRequest request) {
+        Episode episode = episodeService.updateStatus(webtoonId, episodeId, request.status());
         return EpisodeResponse.from(episode);
     }
 }

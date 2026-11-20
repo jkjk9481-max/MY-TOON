@@ -70,5 +70,9 @@ public class Episode {
         this.title = title;
     }
 
+    public void updateStatus(EpisodeStatus status) {
+        this.status = status;
+    }
+
 
 }
