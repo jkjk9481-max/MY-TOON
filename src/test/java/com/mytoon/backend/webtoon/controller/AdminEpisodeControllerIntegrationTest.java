@@ -1,5 +1,6 @@
 package com.mytoon.backend.webtoon.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -156,6 +157,90 @@ class AdminEpisodeControllerIntegrationTest {
                         .header("Authorization", adminAuthHeader())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"episodeNumber\":1,\"title\":\"   \"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    private Episode newEpisode(Webtoon webtoon, int number, String title) {
+        return episodeRepository.save(Episode.builder()
+                .webtoon(webtoon).episodeNumber(number).title(title).status(EpisodeStatus.DRAFT).build());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions patchTitle(Long webtoonId, Long episodeId, String title) throws Exception {
+        return mockMvc.perform(patch("/api/admin/webtoons/" + webtoonId + "/episodes/" + episodeId)
+                .header("Authorization", adminAuthHeader())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"" + title + "\"}"));
+    }
+
+    @Test
+    @DisplayName("제목을 정상 수정하면 200과 바뀐 제목을 반환한다")
+    void updateTitle_success_returns200() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchTitle(webtoon.getId(), ep.getId(), "새 제목")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("새 제목"));
+    }
+
+    @Test
+    @DisplayName("자기 제목 그대로 수정해도 200 (자기 자신은 중복 검사에서 제외)")
+    void updateTitle_sameTitleAsSelf_returns200() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchTitle(webtoon.getId(), ep.getId(), "프롤로그")
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("같은 작품의 다른 회차와 제목이 겹치면 409")
+    void updateTitle_duplicateWithOtherEpisode_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep1 = newEpisode(webtoon, 1, "프롤로그");
+        newEpisode(webtoon, 2, "새로운 시작");
+
+        patchTitle(webtoon.getId(), ep1.getId(), "새로운 시작")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회차면 404")
+    void updateTitle_episodeNotFound_returns404() throws Exception {
+        Webtoon webtoon = newWebtoon();
+
+        patchTitle(webtoon.getId(), 0L, "제목")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 작품이면 404")
+    void updateTitle_webtoonNotFound_returns404() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchTitle(0L, ep.getId(), "제목")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("회차가 다른 작품 소속이면 404 (작품 범위 검사)")
+    void updateTitle_episodeOfOtherWebtoon_returns404() throws Exception {
+        Webtoon webtoonA = newWebtoon();
+        Webtoon webtoonB = newWebtoon();
+        Episode epOfA = newEpisode(webtoonA, 1, "프롤로그");
+
+        patchTitle(webtoonB.getId(), epOfA.getId(), "제목")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("제목이 공백이면 400")
+    void updateTitle_blankTitle_returns400() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "프롤로그");
+
+        patchTitle(webtoon.getId(), ep.getId(), "   ")
                 .andExpect(status().isBadRequest());
     }
 }

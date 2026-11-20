@@ -29,8 +29,8 @@ import lombok.NoArgsConstructor;
         name = "episodes",
         uniqueConstraints = {
                 // 같은 작품 안에서 회차 번호/제목 중복 불가 (V5 마이그레이션의 제약 이름과 맞춘 것)
-                @UniqueConstraint(name = "uq_episodes_webtoon_number", columnNames = {"webtoon_id", "episode_number"}),
-                @UniqueConstraint(name = "uq_episodes_webtoon_title", columnNames = {"webtoon_id", "title"})
+                @UniqueConstraint(name = "uq_episodes_webtoon_number", columnNames = {"webtoon_id", "episode_number"}), // 같은 작품에서 같은 번호 중복불가
+                @UniqueConstraint(name = "uq_episodes_webtoon_title", columnNames = {"webtoon_id", "title"}) // 같은 작품에서 같은 제목 중복 불가
         }
 )
 @Getter
@@ -49,10 +49,10 @@ public class Episode {
             nullable = false,
             foreignKey = @ForeignKey(name = "fk_episodes_webtoon")
     )
-    private Webtoon webtoon;
+    private Webtoon webtoon; // 이 회차가 속한 작품
 
     @Column(name = "episode_number", nullable = false)
-    private int episodeNumber;
+    private int episodeNumber; // 몇화인지
 
     @Column(nullable = false, length = 100)
     private String title;
@@ -61,9 +61,9 @@ public class Episode {
     @Column(nullable = false, length = 20)
     private EpisodeStatus status;
 
-    @CreationTimestamp
+    @CreationTimestamp // 저장되는 순간 현재 시각이 자동으로 들어가고 , 이후 수정 X
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private Instant createdAt; // 등록 시간
 
 
     public void updateTitle(String title){
