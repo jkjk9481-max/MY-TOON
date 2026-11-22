@@ -10,5 +10,6 @@ public enum EpisodeStatus {
     // 선언 순서(ordinal)에 의존하므로 값을 추가/재배치할 때 이 규칙도 함께 확인할 것.
     public boolean canMoveTo(EpisodeStatus next) {
         return next.ordinal() > this.ordinal();
+        // ordinal() -> 선언한 순서 번호 DRAFT = 0 , PREVIEW = 1 , PUBLIC = 2
     }
 }
