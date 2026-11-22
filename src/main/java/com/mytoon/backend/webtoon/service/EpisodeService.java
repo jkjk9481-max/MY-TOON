@@ -89,4 +89,27 @@ public class EpisodeService {
         episode.updateStatus(newStatus);
         return episodeRepository.save(episode);
     }
+
+    // 삭제 규칙: 마지막 회차이면서 PUBLIC이 아닐 때만 (번호 구멍 방지 / 공개된 회차 영구 보존).
+    // 한계: "마지막인지 확인"과 "삭제" 사이에 다른 요청이 새 회차를 등록하면 번호에 구멍이 생길 수 있다
+    // (check-then-act 경쟁 상태). 관리자가 한 명이라 락은 도입하지 않고 한계로 남김.
+    @Transactional
+    public void delete(Long webtoonId, Long episodeId) {
+        // 작품 없음 / 회차 없음 / 다른 작품 소속은 이 조회 하나로 전부 404
+        Episode episode = episodeRepository.findByIdAndWebtoonId(episodeId, webtoonId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 회차입니다."));
+
+        if (episode.getStatus() == EpisodeStatus.PUBLIC) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "공개된 회차는 삭제할 수 없습니다.");
+        }
+
+        int lastNumber = episodeRepository.findMaxEpisodeNumberByWebtoonId(webtoonId);
+        if (episode.getEpisodeNumber() != lastNumber) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "마지막 회차(" + lastNumber + "화)만 삭제할 수 있습니다.");
+        }
+
+        episodeRepository.delete(episode);
+    }
 }

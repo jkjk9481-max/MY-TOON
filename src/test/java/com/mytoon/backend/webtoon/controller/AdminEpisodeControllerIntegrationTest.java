@@ -1,5 +1,6 @@
 package com.mytoon.backend.webtoon.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -357,5 +358,107 @@ class AdminEpisodeControllerIntegrationTest {
 
         patchStatus(webtoon.getId(), ep.getId(), "{\"status\":\"HIDDEN\"}")
                 .andExpect(status().isBadRequest());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions deleteEpisode(Long webtoonId, Long episodeId) throws Exception {
+        return mockMvc.perform(delete("/api/admin/webtoons/" + webtoonId + "/episodes/" + episodeId)
+                .header("Authorization", adminAuthHeader()));
+    }
+
+    @Test
+    @DisplayName("마지막 회차이면서 DRAFT면 204로 삭제된다")
+    void delete_lastDraftEpisode_returns204() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        newEpisode(webtoon, 1, "1화");
+        Episode last = newEpisode(webtoon, 2, "2화");
+
+        deleteEpisode(webtoon.getId(), last.getId())
+                .andExpect(status().isNoContent());
+
+        org.junit.jupiter.api.Assertions.assertFalse(episodeRepository.findById(last.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("마지막 회차이면 PREVIEW도 삭제할 수 있다")
+    void delete_lastPreviewEpisode_returns204() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode last = newEpisodeWithStatus(webtoon, 1, "1화", EpisodeStatus.PREVIEW);
+
+        deleteEpisode(webtoon.getId(), last.getId())
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("PUBLIC 회차는 마지막이어도 409")
+    void delete_publicEpisode_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode last = newEpisodeWithStatus(webtoon, 1, "1화", EpisodeStatus.PUBLIC);
+
+        deleteEpisode(webtoon.getId(), last.getId())
+                .andExpect(status().isConflict());
+
+        org.junit.jupiter.api.Assertions.assertTrue(episodeRepository.findById(last.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("마지막 회차가 아니면 409 (번호 구멍 방지)")
+    void delete_notLastEpisode_returns409() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode first = newEpisode(webtoon, 1, "1화");
+        newEpisode(webtoon, 2, "2화");
+
+        deleteEpisode(webtoon.getId(), first.getId())
+                .andExpect(status().isConflict());
+
+        org.junit.jupiter.api.Assertions.assertTrue(episodeRepository.findById(first.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("없는 회차는 404")
+    void delete_episodeNotFound_returns404() throws Exception {
+        Webtoon webtoon = newWebtoon();
+
+        deleteEpisode(webtoon.getId(), 0L)
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("없는 작품은 404")
+    void delete_webtoonNotFound_returns404() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode ep = newEpisode(webtoon, 1, "1화");
+
+        deleteEpisode(0L, ep.getId())
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("다른 작품 소속 회차는 404")
+    void delete_episodeOfOtherWebtoon_returns404() throws Exception {
+        Webtoon webtoonA = newWebtoon();
+        Webtoon webtoonB = newWebtoon();
+        Episode epOfA = newEpisode(webtoonA, 1, "1화");
+
+        deleteEpisode(webtoonB.getId(), epOfA.getId())
+                .andExpect(status().isNotFound());
+
+        org.junit.jupiter.api.Assertions.assertTrue(episodeRepository.findById(epOfA.getId()).isPresent());
+    }
+
+    @Test
+    @DisplayName("삭제 후 같은 번호로 다시 등록할 수 있다 (번호 구멍이 안 생겼다는 증거)")
+    void delete_thenRecreateSameNumber_returns201() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        newEpisode(webtoon, 1, "1화");
+        Episode last = newEpisode(webtoon, 2, "2화");
+
+        deleteEpisode(webtoon.getId(), last.getId())
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/admin/webtoons/" + webtoon.getId() + "/episodes")
+                        .header("Authorization", adminAuthHeader())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"episodeNumber\":2,\"title\":\"2화\"}"))
+                .andExpect(status().isCreated());
     }
 }
