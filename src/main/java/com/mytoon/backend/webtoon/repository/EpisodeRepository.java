@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.mytoon.backend.webtoon.entity.Episode;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface EpisodeRepository extends JpaRepository<Episode, Long> {
@@ -25,4 +26,7 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
 
     // Optional -> 이 값은 없을수도있다
     Optional<Episode> findByIdAndWebtoonId(Long episodeId , Long webtoonId);
+
+    // 독자용 회차 목록 조회: 번호 순서대로
+    List<Episode> findByWebtoonIdOrderByEpisodeNumberAsc(Long webtoonId);
 }

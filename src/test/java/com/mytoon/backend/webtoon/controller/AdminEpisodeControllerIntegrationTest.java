@@ -465,12 +465,17 @@ class AdminEpisodeControllerIntegrationTest {
     @Test
     @DisplayName("PUBLIC이면서 마지막 회차가 아니어도 공개 검사가 먼저 걸려 409")
     void delete_publicEpisodeThatIsNotLast_returns409WithPublicReason() throws Exception {
-        Webtoon webtoon = newWebtoon();
+        Webtoon webtoon = newWebtoon(); // 테스트용 작품 하나 만듬
         Episode first = newEpisodeWithStatus(webtoon, 1, "1화", EpisodeStatus.PUBLIC);
+        // 1화는 PUBLIC 상태 , 2화는 기본적으로 DRAFT 상태로 만듬 이렇게하면 1화는 공개됐지만 마지막이 아닌 상태가 된다
         newEpisode(webtoon, 2, "2화");
 
-        deleteEpisode(webtoon.getId(), first.getId())
+        deleteEpisode(webtoon.getId(), first.getId()) // 1화를 삭제 시도
                 .andExpect(status().isConflict())
                 .andExpect(status().reason("공개된 회차는 삭제할 수 없습니다."));
+
+        // 두 가지 검증을함
+        // 1.HTTP 상태 코드가 409인지 , 2.그 409의 구체적인 이유가 마지막 회차만 삭제할 수 있습니다 가 아니라 공개된 회차는 삭제할 수 없습니다인지
+
     }
 }

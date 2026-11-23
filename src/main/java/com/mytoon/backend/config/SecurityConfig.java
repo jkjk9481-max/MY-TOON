@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // 관리자 API는 ADMIN만 (JWT의 role이 ROLE_ADMIN으로 등록됨)
+                        .requestMatchers("/api/webtoons/**").permitAll() // 독자용 조회 API: 비회원도 호출 가능, 회원/비회원 구분은 Controller 안에서
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
