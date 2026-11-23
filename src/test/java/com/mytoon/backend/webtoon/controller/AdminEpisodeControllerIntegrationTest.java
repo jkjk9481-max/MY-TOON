@@ -461,4 +461,16 @@ class AdminEpisodeControllerIntegrationTest {
                         .content("{\"episodeNumber\":2,\"title\":\"2화\"}"))
                 .andExpect(status().isCreated());
     }
+
+    @Test
+    @DisplayName("PUBLIC이면서 마지막 회차가 아니어도 공개 검사가 먼저 걸려 409")
+    void delete_publicEpisodeThatIsNotLast_returns409WithPublicReason() throws Exception {
+        Webtoon webtoon = newWebtoon();
+        Episode first = newEpisodeWithStatus(webtoon, 1, "1화", EpisodeStatus.PUBLIC);
+        newEpisode(webtoon, 2, "2화");
+
+        deleteEpisode(webtoon.getId(), first.getId())
+                .andExpect(status().isConflict())
+                .andExpect(status().reason("공개된 회차는 삭제할 수 없습니다."));
+    }
 }
