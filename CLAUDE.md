@@ -269,6 +269,40 @@
   독자에게 DRAFT는 존재 자체를 숨김 (PREVIEW 노출 여부는 ② 설계 때 결정)
 - 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
+## 진행 중: 웹툰 이미지 업로드 API (2026-11-24, 미완성 - 다음에 이어서)
+- 요구사항 분석 → 설계 승인 → 구현까지 끝남, 커밋 전이라 아직 push 안 됨. **학습(코드 설명/이해도 퀴즈/독립 과제)도 아직 안 함**
+- 확정된 설계: 회차당 이미지 여러 장(엔티티 `EpisodeImage`: `episode_id`/`image_order`/`path`, `UNIQUE(episode_id, image_order)`).
+  업로드 순서 = 컷 순서(클라이언트가 번호를 안 보냄). **DRAFT 회차만 업로드/재업로드 가능**(PREVIEW/PUBLIC은 409 —
+  PREVIEW도 잉크 구매자에게 보일 수 있어서 잠금). 재업로드는 **전체 교체**(기존 걸 지우고 새로 다 넣음).
+  확장자 jpg/png/webp만, 장당 10MB, 회차당 최대 300장. 저장 경로 `webtoons/{webtoonId}/episodes/{episodeId}/{순서}.{ext}`
+  (원본 파일명 대신 서버가 순서 번호로 직접 이름을 지음 - Path Traversal 방지)
+- 새 파일: `V6__create_episode_images.sql`, `EpisodeImage`, `EpisodeImageRepository`, `EpisodeImageStorage`
+  (경로 계산 + 디렉토리 삭제 전담, `EpisodeImageService`/`EpisodeService`가 같이 씀), `EpisodeImageService`,
+  `AdminEpisodeImageController`(`POST .../episodes/{episodeId}/images`, multipart), `EpisodeImageResponse`
+- **파일 안전성 설계**: 파일을 디스크에 쓰는 건 `@Transactional` 롤백 대상이 아니라는 점을 짚고 감(지난
+  `refresh()`/`noRollbackFor` 학습과 연결됨). 새 파일을 임시 이름(`.tmp`)으로 먼저 다 써보고, 성공해야만
+  DB를 바꾸고, 그 다음에야 기존 파일 삭제 + 임시 파일을 최종 이름으로 교체. DB 교체(기존 행 삭제+새 행 삽입)는
+  `EpisodeImageService.upload()` 전체를 `@Transactional`로 걸지 않고 **`TransactionTemplate`으로 그 구간만** 별도
+  트랜잭션으로 묶음(새로 배운 개념 - 메서드 전체를 트랜잭션으로 걸면 파일 I/O 중에도 DB 커넥션을 쥐게 되고,
+  "DB 커밋 후 최종 파일 교체 중 실패" 시나리오에서 DB와 파일이 불일치할 위험이 있어서). 알려진 잔여 리스크
+  (문서화하고 감수): 최종 파일 교체(rename) 단계가 "DB 커밋 완료" 이후라 실패해도 DB 롤백이 안 됨 - 드물게
+  rename 실패 시 DB와 실제 파일이 일시적으로 안 맞을 수 있음(재업로드로 자가 복구 가능)
+- 기존 코드 변경: `EpisodeService.updateStatus()`에 "이미지 0장이면 PREVIEW/PUBLIC 전환 거부(409)" 추가,
+  `EpisodeService.delete()`에 파일 삭제 추가(DB `episode_images` 행은 `ON DELETE CASCADE`로 자동 정리,
+  파일은 `EpisodeImageStorage.deleteEpisodeDir()`로 직접 삭제, best-effort라 실패해도 삭제 자체는 안 막음).
+  `application.properties`에 `app.upload.root-dir`, multipart 용량 제한 추가
+- **알려진 문제 (다음에 반드시 먼저 처리)**: `./gradlew test` 91개 중 **3개 FAIL** —
+  `AdminEpisodeControllerIntegrationTest`의 상태 전환 테스트 3개(`updateStatus_draftToPreview_returns200`,
+  `updateStatus_previewToPublic_returns200`, `updateStatus_draftToPublic_returns200`, 261~291번째 줄)가
+  오늘 추가한 "이미지 0장이면 전환 거부" 규칙 때문에 깨짐(이 테스트들은 이미지 없이 회차만 만들고 전환을
+  요청해서 전부 409가 나옴 - 오늘 생긴 규칙보다 먼저 작성된 테스트라 전제가 깨짐). 도윤이 원인은 스스로
+  찾음(해당 줄 정확히 지적). **고치는 건 독립 과제로 다음 세션에 진행** — 힌트: `EpisodeImageRepository`를
+  테스트에 `@Autowired`로 추가하고, `newEpisode`(164번째 줄)처럼 `EpisodeImage.builder()...save()`로
+  이미지 1장을 미리 넣어두는 헬퍼를 만들어서 3개 테스트에 적용
+- 아직 안 한 것: 업로드 API 자체의 통합 테스트(`AdminEpisodeImageControllerIntegrationTest` 같은 것 없음),
+  실제로 파일이 디스크에 써지는지/재업로드 시 전체 교체가 제대로 되는지 수동 검증, 코드 설명 4~5개 클래스,
+  이해도 퀴즈, 독립 과제. 컴파일은 성공 확인(`gradlew compileJava`)했지만 업로드 플로우 자체는 실행해본 적 없음
+
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
 - **최우선 (다른 작업 들어가기 전에 반드시 완전히 정리)**: `AuthService.refresh()` / `noRollbackFor` 범위 문제
   (2026-11-18 복습에서 끝내 본인 말로 정리 못 하고 다음으로 미룸). 걸렸던 지점 요약:

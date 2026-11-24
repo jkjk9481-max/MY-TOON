@@ -9,6 +9,7 @@ import com.mytoon.backend.webtoon.controller.dto.EpisodeCreateRequest;
 import com.mytoon.backend.webtoon.entity.Episode;
 import com.mytoon.backend.webtoon.entity.EpisodeStatus;
 import com.mytoon.backend.webtoon.entity.Webtoon;
+import com.mytoon.backend.webtoon.repository.EpisodeImageRepository;
 import com.mytoon.backend.webtoon.repository.EpisodeRepository;
 import com.mytoon.backend.webtoon.repository.WebtoonRepository;
 
@@ -20,6 +21,8 @@ public class EpisodeService {
 
     private final EpisodeRepository episodeRepository;
     private final WebtoonRepository webtoonRepository;
+    private final EpisodeImageRepository episodeImageRepository;
+    private final EpisodeImageStorage episodeImageStorage;
 
     @Transactional
     public Episode create(Long webtoonId, EpisodeCreateRequest request) {
@@ -86,6 +89,10 @@ public class EpisodeService {
                     episode.getStatus() + "에서 " + newStatus + "(으)로는 변경할 수 없습니다.");
         }
 
+        if (episodeImageRepository.countByEpisodeId(episodeId) == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미지가 없는 회차는 공개 상태로 전환할 수 없습니다.");
+        }
+
         episode.updateStatus(newStatus);
         return episodeRepository.save(episode);
     }
@@ -111,5 +118,6 @@ public class EpisodeService {
         }
 
         episodeRepository.delete(episode);
+        episodeImageStorage.deleteEpisodeDir(webtoonId, episodeId); // DB는 ON DELETE CASCADE로 정리됨, 파일은 직접 삭제
     }
 }
