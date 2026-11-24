@@ -13,6 +13,7 @@ export default function MainPage() {
     title: webtoon.title,
     description: webtoon.description,
     coverGradient: webtoon.coverGradient,
+    posterImageUrl: webtoon.posterImageUrl,
     viewHref: `/webtoons/${webtoon.id}/episodes/${webtoon.episodes[0].episodeNumber}`,
     detailHref: `/webtoons/${webtoon.id}`,
   }))

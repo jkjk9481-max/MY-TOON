@@ -14,6 +14,8 @@ export interface MockWebtoon {
   authorName: string
   description: string
   coverGradient: string
+  // 실제 포스터 이미지가 준비되면 이 값만 채우면 된다 (없으면 placeholder가 렌더링됨).
+  posterImageUrl?: string
   episodes: MockEpisode[]
 }
 
