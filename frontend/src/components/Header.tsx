@@ -1,14 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import './Header.css'
 
+const SCROLL_THRESHOLD_PX = 24
+
 export default function Header() {
   const { auth, loginMock, logout } = useAuth()
   const [showLoginOptions, setShowLoginOptions] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  // 히어로 배너 위에서는 투명하게 떠 있다가, 스크롤하면 기존 반투명+블러 스타일로 전환된다.
+  useEffect(() => {
+    function handleScroll() {
+      setIsScrolled(window.scrollY > SCROLL_THRESHOLD_PX)
+    }
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
-    <header className="header">
+    <header className={`header ${isScrolled ? 'header--scrolled' : ''}`}>
       <div className="header__inner page-container">
         <Link to="/" className="header__logo">
           MY-TOON

@@ -7,6 +7,8 @@ export interface HeroSlide {
   title: string
   description: string
   coverGradient: string
+  // 실제 포스터 이미지가 준비되면 이 값만 채우면 된다 (없으면 placeholder가 렌더링됨).
+  posterImageUrl?: string
   viewHref: string
   detailHref: string
 }
@@ -67,28 +69,55 @@ export default function HeroBanner({ slides }: { slides: HeroSlide[] }) {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {slides.map((slide, index) => (
-        <div
-          key={slide.id}
-          className={`hero__slide ${index === currentIndex ? 'hero__slide--active' : ''}`}
-          aria-hidden={index !== currentIndex}
-        >
-          <div className="hero__background" style={{ backgroundImage: slide.coverGradient }} />
-          <div className="hero__overlay" />
-          <div className="hero__content">
-            <h1 className="hero__title">{slide.title}</h1>
-            <p className="hero__description">{slide.description}</p>
-            <div className="hero__actions">
-              <Link to={slide.viewHref} className="hero__button hero__button--primary">
-                감상하기
-              </Link>
-              <Link to={slide.detailHref} className="hero__button hero__button--secondary">
-                작품 상세 보기
-              </Link>
+      {slides.map((slide, index) => {
+        const isActive = index === currentIndex
+        return (
+          <div
+            key={slide.id}
+            className={`hero__slide ${isActive ? 'hero__slide--active' : ''}`}
+            aria-hidden={!isActive}
+          >
+            <div className="hero__backdrop" style={{ backgroundImage: slide.coverGradient }} />
+            <div className="hero__scrim" />
+
+            <div className="hero__layout page-container">
+              <div className="hero__text">
+                <span className="hero__brand">MY-TOON ORIGINAL</span>
+                <h1 className="hero__title">{slide.title}</h1>
+                <p className="hero__description">{slide.description}</p>
+                <div className="hero__actions">
+                  {/* 비활성 슬라이드의 버튼은 화면에 안 보이므로 탭 순서에서도 제외한다 */}
+                  <Link
+                    to={slide.viewHref}
+                    className="hero__button hero__button--primary"
+                    tabIndex={isActive ? undefined : -1}
+                  >
+                    감상하기
+                  </Link>
+                  <Link
+                    to={slide.detailHref}
+                    className="hero__button hero__button--secondary"
+                    tabIndex={isActive ? undefined : -1}
+                  >
+                    작품 상세 보기
+                  </Link>
+                </div>
+              </div>
+
+              <div className="hero__poster" aria-hidden="true">
+                {slide.posterImageUrl ? (
+                  <img className="hero__poster-image" src={slide.posterImageUrl} alt="" />
+                ) : (
+                  <div className="hero__poster-placeholder">
+                    <span className="hero__poster-placeholder-icon">🎬</span>
+                    <span className="hero__poster-placeholder-text">포스터 이미지 준비 중</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {hasMultipleSlides && (
         <>

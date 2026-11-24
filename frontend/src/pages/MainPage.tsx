@@ -24,17 +24,25 @@ export default function MainPage() {
       <div className="page-container">
         <section className="main-section">
           <h2 className="main-section__title">최신 업데이트 회차</h2>
-          <div className="episode-row">
+          <div className="episode-card-row">
             {mockWebtoon.episodes.map((episode) => {
               const requiresLogin = episode.episodeNumber >= 2 && !auth
               return (
                 <Link
                   key={episode.episodeNumber}
                   to={`/webtoons/${mockWebtoon.id}/episodes/${episode.episodeNumber}`}
-                  className="episode-row__item"
+                  className="episode-card"
                 >
-                  <span>{episode.title}</span>
-                  {requiresLogin && <span className="episode-row__lock">🔒 로그인 필요</span>}
+                  <div
+                    className="episode-card__thumb"
+                    style={{ backgroundImage: mockWebtoon.coverGradient }}
+                  >
+                    <span className="episode-card__number">{episode.episodeNumber}</span>
+                  </div>
+                  <div className="episode-card__meta">
+                    <span className="episode-card__title">{episode.title}</span>
+                    {requiresLogin && <span className="episode-card__lock">🔒 로그인 필요</span>}
+                  </div>
                 </Link>
               )
             })}
