@@ -233,6 +233,21 @@
   AI 도움 없는 독립 과제 필수, 기능 완료와 학습 완료를 분리 평가. 이 지침에 따라 오늘 Episode 등록 API부터
   요구사항 분석(사용자가 먼저 엔드포인트/필드/에러케이스 제안) → 설계 승인 → 구현 → 코드 설명(1개씩) →
   이해도 퀴즈(점수제) → 독립 과제(`updateTitle`) 순서로 실제 적용함
+- 완료: 독자용 회차 목록 API(`GET /api/webtoons/{webtoonId}/episodes`, 커밋 6e618b1) 코드 설명 + 이해도 퀴즈
+  (2026-11-24). 클래스 4개(`EpisodeAccessResponse`, `EpisodeRepository.findByWebtoonIdOrderByEpisodeNumberAsc`,
+  `EpisodeController`, `EpisodeQueryService`) 전부 설명함. 새로 배운 개념: `AnonymousAuthenticationToken`
+  (Spring Security는 비회원도 `Authentication`을 null이 아닌 익명 토큰으로 채워 넣고, `isAuthenticated()`는
+  익명이어도 true를 반환하므로 `instanceof AnonymousAuthenticationToken`로 따로 걸러야 진짜 로그인 여부를
+  알 수 있음). `isLoggedIn`이 컨트롤러에서 한 번만 계산돼 회차마다 재사용되는 "고정값"이라는 점을
+  처음엔 "이 줄이 로그인 여부를 판단한다"고 오해했다가 구체적인 2~3화 예시(표)로 정정함.
+  이해도 퀴즈 3문항: ① 1~2화 무료로 정책 변경 시 수정 위치 — 바로 정답(`toResponse`의 `== 1`을 `<= 2`로).
+  ② "비회원인데 accessible:true" 버그 디버깅 — 처음엔 `isVisible`/`toResponse` 공식만 봤으나, 힌트
+  (공식상 `isLoggedIn=true`가 확정된다) 후 "`JwtAuthenticationFilter`가 비회원 요청에 잘못 인증 객체를
+  채웠을 가능성"까지 추론 성공. ③ `webtoonRepository.existsById` 404 체크가 없으면 생기는 문제
+  (존재하지 않는 작품도 200+빈 배열이 되어 "회차 없음"과 "작품 없음"을 구분 못 함) — 바로 정답.
+  독립 과제는 이번엔 생략(세 질문이 이미 응용/문제해결을 충분히 다룸). 참고: 도윤이 이 세션 중 직접
+  `EpisodeController`/`EpisodeAccessResponse`/`EpisodeQueryService`에 설명 내용을 자기 말로 인라인 주석으로
+  달아둠(코드 변경 없음, 주석만 추가) — 능동적으로 복습한 흔적이라 그대로 유지
 
 ## 확정된 설계 결정 (Episode, 2026-11-15)
 - 회차 번호: 작품 안에서 유일, 1부터 시작, **건너뛰기 금지** (DB 제약으로는 못 막으므로 관리자 API에서
@@ -281,7 +296,8 @@
     코드 리딩 추정이며 실제로 지워서 실행해 확인하진 않음 → 직접 실험 권장)
   - **미완 독립 과제**: "DRAFT→PUBLIC 직행 금지, PREVIEW 필수"로 요구사항이 바뀌면 어디를 고치고 어떤 테스트가
     깨지고 무엇을 추가할지 (2026-11-22에도 사용자가 진도 먼저 나가자고 해서 시도 안 함)
-  - 다음 할 일: ②독자용 조회 API (비회원 접근 규칙 SecurityConfig 변경 필요, PREVIEW 노출 여부 결정)
+  - ②독자용 조회 API 구현은 2026-11-23(커밋 6e618b1)에 완료, 코드 설명·이해도 퀴즈는 2026-11-24에 완료
+    (내용은 위 "현재 상태" 참고)
   - **2026-11-22 세션 결과 — `refresh()`/`noRollbackFor` 정리 (사실상 해결, 응용은 보강 필요)**:
     시간 순서 예시(T1 사용→T2 발급→공격자가 T1 재전송)로 "탈취 의심 호출에선 97번째 줄을 안 지나가고
     87~88번째 줄만 탄다", "노롤백이 없으면 T2 폐기가 롤백되어 T2가 활성으로 남는다"를 본인 말로 정리함.
