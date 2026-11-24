@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import { accessReasonLabel } from '../api/episodes'
+import { useEpisodes } from '../hooks/useEpisodes'
 import { mockWebtoon } from '../mock/data'
 import './WebtoonDetailPage.css'
 
-// 비회원은 1화까지만 자유 열람, 2화부터는 로그인이 필요하다는 확정 정책(CLAUDE.md)을 목록에서도 보여준다.
+// 실제 접근 제한(2화부터 로그인 필요)을 백엔드 EpisodeQueryService의 판정(accessible/reason)에 맡긴다.
+// 작품 제목/작가/소개/포스터는 아직 공개 조회 API가 없어 mock을 그대로 쓴다.
 export default function WebtoonDetailPage() {
-  const { auth } = useAuth()
-  const firstEpisode = mockWebtoon.episodes[0]
+  const episodesState = useEpisodes(mockWebtoon.id)
+  const firstEpisodeNumber =
+    episodesState.status === 'success' ? episodesState.episodes[0]?.episodeNumber : undefined
 
   return (
     <div className="webtoon-detail">
@@ -35,25 +38,30 @@ export default function WebtoonDetailPage() {
             <h1 className="webtoon-detail__title">{mockWebtoon.title}</h1>
             <p className="webtoon-detail__author">{mockWebtoon.authorName}</p>
             <p className="webtoon-detail__description">{mockWebtoon.description}</p>
-            <Link
-              to={`/webtoons/${mockWebtoon.id}/episodes/${firstEpisode.episodeNumber}`}
-              className="webtoon-detail__start-button"
-            >
-              감상 시작하기
-            </Link>
+            {firstEpisodeNumber !== undefined && (
+              <Link
+                to={`/webtoons/${mockWebtoon.id}/episodes/${firstEpisodeNumber}`}
+                className="webtoon-detail__start-button"
+              >
+                감상 시작하기
+              </Link>
+            )}
           </div>
         </div>
 
         <section className="webtoon-detail__episodes">
           <h2 className="webtoon-detail__episodes-title">전체 회차</h2>
-          <ul className="episode-list">
-            {mockWebtoon.episodes.map((episode) => {
-              const requiresLogin = episode.episodeNumber >= 2 && !auth
-              return (
+
+          {episodesState.status === 'loading' && <p>회차 목록을 불러오는 중...</p>}
+          {episodesState.status === 'error' && <p>{episodesState.message}</p>}
+
+          {episodesState.status === 'success' && (
+            <ul className="episode-list">
+              {episodesState.episodes.map((episode) => (
                 <li key={episode.episodeNumber}>
                   <Link
                     to={`/webtoons/${mockWebtoon.id}/episodes/${episode.episodeNumber}`}
-                    className={`episode-list__item ${requiresLogin ? 'episode-list__item--locked' : ''}`}
+                    className={`episode-list__item ${!episode.accessible ? 'episode-list__item--locked' : ''}`}
                   >
                     <div
                       className="episode-list__thumb"
@@ -63,15 +71,15 @@ export default function WebtoonDetailPage() {
                     </div>
                     <div className="episode-list__meta">
                       <span className="episode-list__title">{episode.title}</span>
-                      {requiresLogin && (
-                        <span className="episode-list__status">🔒 로그인 필요</span>
+                      {!episode.accessible && (
+                        <span className="episode-list__status">🔒 {accessReasonLabel(episode.reason)}</span>
                       )}
                     </div>
                   </Link>
                 </li>
-              )
-            })}
-          </ul>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </div>

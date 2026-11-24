@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom'
 import HeroBanner from '../components/HeroBanner'
 import WebtoonCard from '../components/WebtoonCard'
-import { useAuth } from '../auth/AuthContext'
+import { accessReasonLabel } from '../api/episodes'
+import { useEpisodes } from '../hooks/useEpisodes'
 import { heroSlides, mockWebtoon } from '../mock/data'
 import './MainPage.css'
 
 export default function MainPage() {
-  const { auth } = useAuth()
+  const episodesState = useEpisodes(mockWebtoon.id)
 
+  // 작품 제목/작가/소개/표지는 아직 공개 조회 API가 없어 mock 유지, 1화는 정책상 항상 공개라 고정 링크로 둔다.
   const slides = heroSlides.map((webtoon) => ({
     id: webtoon.id,
     title: webtoon.title,
     description: webtoon.description,
     coverGradient: webtoon.coverGradient,
     posterImageUrl: webtoon.posterImageUrl,
-    viewHref: `/webtoons/${webtoon.id}/episodes/${webtoon.episodes[0].episodeNumber}`,
+    viewHref: `/webtoons/${webtoon.id}/episodes/1`,
     detailHref: `/webtoons/${webtoon.id}`,
   }))
 
@@ -25,10 +27,13 @@ export default function MainPage() {
       <div className="page-container">
         <section className="main-section">
           <h2 className="main-section__title">최신 업데이트 회차</h2>
-          <div className="episode-card-row">
-            {mockWebtoon.episodes.map((episode) => {
-              const requiresLogin = episode.episodeNumber >= 2 && !auth
-              return (
+
+          {episodesState.status === 'loading' && <p>회차 목록을 불러오는 중...</p>}
+          {episodesState.status === 'error' && <p>{episodesState.message}</p>}
+
+          {episodesState.status === 'success' && (
+            <div className="episode-card-row">
+              {episodesState.episodes.map((episode) => (
                 <Link
                   key={episode.episodeNumber}
                   to={`/webtoons/${mockWebtoon.id}/episodes/${episode.episodeNumber}`}
@@ -42,12 +47,14 @@ export default function MainPage() {
                   </div>
                   <div className="episode-card__meta">
                     <span className="episode-card__title">{episode.title}</span>
-                    {requiresLogin && <span className="episode-card__lock">🔒 로그인 필요</span>}
+                    {!episode.accessible && (
+                      <span className="episode-card__lock">🔒 {accessReasonLabel(episode.reason)}</span>
+                    )}
                   </div>
                 </Link>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section id="explore" className="main-section">
