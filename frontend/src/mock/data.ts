@@ -7,6 +7,8 @@ export interface MockWebtoon {
   id: number
   title: string
   authorName: string
+  genres: string[]
+  tagline: string
   description: string
   coverGradient: string
   // 실제 포스터 이미지가 준비되면 이 값만 채우면 된다 (없으면 placeholder가 렌더링됨).
@@ -17,7 +19,10 @@ export const mockWebtoon: MockWebtoon = {
   id: 1,
   title: '국가특별대응단',
   authorName: '도윤',
-  description: '', // TODO: 소개 문구 작성 예정
+  genres: ['액션', '범죄', '성장', '드라마'],
+  tagline: '최악의 상황, 최후의 대응.',
+  description:
+    '수년간의 경찰공무원 시험에서 번번이 실패한 이효섭. 꿈을 포기하려던 순간, 국가특별대응단이라는 새로운 기회가 찾아온다. 자신의 한계를 넘어서는 그의 도전이 시작된다.',
   coverGradient: 'linear-gradient(135deg, #1e3a8a 0%, #0a0e1a 60%, #3b82f6 140%)',
   posterImageUrl: '/poster-main.png',
 }

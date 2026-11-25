@@ -5,6 +5,8 @@ import './HeroBanner.css'
 export interface HeroSlide {
   id: number | string
   title: string
+  genres: string[]
+  tagline: string
   description: string
   coverGradient: string
   // 실제 포스터 이미지가 준비되면 이 값만 채우면 된다 (없으면 placeholder가 렌더링됨).
@@ -84,6 +86,14 @@ export default function HeroBanner({ slides }: { slides: HeroSlide[] }) {
               <div className="hero__text">
                 <span className="hero__brand">MY-TOON ORIGINAL</span>
                 <h1 className="hero__title">{slide.title}</h1>
+                <ul className="hero__genres">
+                  {slide.genres.map((genre) => (
+                    <li key={genre} className="hero__genre">
+                      {genre}
+                    </li>
+                  ))}
+                </ul>
+                <p className="hero__tagline">{slide.tagline}</p>
                 <p className="hero__description">{slide.description}</p>
                 <div className="hero__actions">
                   {/* 비활성 슬라이드의 버튼은 화면에 안 보이므로 탭 순서에서도 제외한다 */}

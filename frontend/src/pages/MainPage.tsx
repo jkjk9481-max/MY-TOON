@@ -13,6 +13,8 @@ export default function MainPage() {
   const slides = heroSlides.map((webtoon) => ({
     id: webtoon.id,
     title: webtoon.title,
+    genres: webtoon.genres,
+    tagline: webtoon.tagline,
     description: webtoon.description,
     coverGradient: webtoon.coverGradient,
     posterImageUrl: webtoon.posterImageUrl,

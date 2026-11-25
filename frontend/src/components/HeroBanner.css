@@ -102,6 +102,30 @@
   letter-spacing: -0.5px;
 }
 
+.hero__genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.hero__genre + .hero__genre::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--text);
+}
+
+.hero__tagline {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
 @media (max-width: 1024px) {
   .hero__title {
     font-size: 38px;
