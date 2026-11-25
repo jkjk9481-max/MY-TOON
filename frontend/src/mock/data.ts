@@ -15,10 +15,11 @@ export interface MockWebtoon {
 
 export const mockWebtoon: MockWebtoon = {
   id: 1,
-  title: '달빛 아래 수상한 편의점',
+  title: '국가특별대응단',
   authorName: '도윤',
-  description: '자정이 넘으면 손님들이 조금 이상해지는 편의점 이야기.',
+  description: '', // TODO: 소개 문구 작성 예정
   coverGradient: 'linear-gradient(135deg, #1e3a8a 0%, #0a0e1a 60%, #3b82f6 140%)',
+  posterImageUrl: '/poster-main.png',
 }
 
 // 메인 배너는 여러 작품을 받을 수 있는 구조로 만들어서, 나중에 작품이 늘어나면 그대로 슬라이드가 된다.
