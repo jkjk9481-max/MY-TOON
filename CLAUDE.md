@@ -156,7 +156,7 @@
 
 장기적으로 다른 작가의 작품 등록과 실제 결제·정산 기능을 추가한다.
 
-## 현재 상태 / 다음 할 일 (2026-11-23 기준)
+## 현재 상태 / 다음 할 일 (2026-11-25 기준)
 - 완료: User/SocialAccount/RefreshToken 엔티티, V1·V2·V3 마이그레이션, Repository 3개, AuthService(+단위 테스트)
 - 완료: 구글/카카오 OAuth2 code 교환 — `AuthController`가 `/api/auth/{provider}/login`으로 code를 받아
   `OAuth2ClientRegistry`(Google/KakaoOAuth2Client)로 토큰 교환 + 사용자 정보 조회 후 기존 AuthService에 위임.
@@ -248,6 +248,19 @@
   독립 과제는 이번엔 생략(세 질문이 이미 응용/문제해결을 충분히 다룸). 참고: 도윤이 이 세션 중 직접
   `EpisodeController`/`EpisodeAccessResponse`/`EpisodeQueryService`에 설명 내용을 자기 말로 인라인 주석으로
   달아둠(코드 변경 없음, 주석만 추가) — 능동적으로 복습한 흔적이라 그대로 유지
+- 완료: 메인 웹툰 포스터/제목/소개 문구 확정 + 반영 (2026-11-25, 커밋 815cd64/38da6bb). 제목을 placeholder
+  "달빛 아래 수상한 편의점"에서 실제 작품 **"국가특별대응단"**으로 교체, 포스터 이미지(`frontend/public/poster-main.png`,
+  1024x1536 세로 2:3 비율) 추가. 히어로 배너/작품 상세 페이지의 포스터 박스가 원래 가로형(히어로)·3:4(상세)라
+  세로 포스터가 위아래로 크게 잘리는 문제를 발견 → 두 박스 모두 `aspect-ratio: 2/3`로 이미지 실제 비율에
+  맞추고 `object-fit: contain`으로 바꿔 해결(자르지도 않고 빈 레터박스도 없는 방식, 단순히 `object-fit: cover`
+  → `contain`으로만 바꾸는 타협안 대신 선택). 이어서 장르 태그(`hero__genres`) + 굵은 태그라인(`hero__tagline`)
+  + 본문 설명을 구조적으로 분리한 레이아웃 추가(`HeroSlide`/`MockWebtoon`에 `genres`/`tagline` 필드 신규 추가).
+  **알아둘 점**: 백엔드 `Webtoon` 엔티티엔 `genre`/`tagline` 컬럼이 없어서 이 필드들은 지금 프론트 mock에만
+  존재함 — 나중에 실제 작품 공개 조회 API를 만들 때 DB 컬럼으로 승격할지 결정 필요. Playwright 스크린샷으로
+  렌더링 확인(크롭 안 됨, 레이아웃 일치) 완료, 이번 작업은 전부 간단한 프론트 수정이라 코드 설명/이해도
+  퀴즈는 생략(지침 9번 — 핵심 백엔드 로직이 아닌 단순 UI 작업)
+- 완료: README.md 최신화 (2026-11-25, 커밋 699e04d) — 회차 삭제 API, 독자용 조회 API(프론트 실제 연동 완료)
+  반영, 이미지 업로드 API를 "진행 중" 섹션으로 신설해 WIP 상태 명시
 
 ## 확정된 설계 결정 (Episode, 2026-11-15)
 - 회차 번호: 작품 안에서 유일, 1부터 시작, **건너뛰기 금지** (DB 제약으로는 못 막으므로 관리자 API에서
@@ -269,8 +282,8 @@
   독자에게 DRAFT는 존재 자체를 숨김 (PREVIEW 노출 여부는 ② 설계 때 결정)
 - 소프트 삭제는 채택하지 않음 (UNIQUE가 삭제된 번호·제목을 계속 점유하는 문제). 삭제 기능이 더 필요해지면 그때 재검토
 
-## 진행 중: 웹툰 이미지 업로드 API (2026-11-24, 미완성 - 다음에 이어서)
-- 요구사항 분석 → 설계 승인 → 구현까지 끝남, 커밋 전이라 아직 push 안 됨. **학습(코드 설명/이해도 퀴즈/독립 과제)도 아직 안 함**
+## 진행 중: 웹툰 이미지 업로드 API (2026-11-24 구현, 미완성 - 다음에 이어서)
+- 요구사항 분석 → 설계 승인 → 구현까지 끝나서 커밋/push 완료(커밋 7d36784). **학습(코드 설명/이해도 퀴즈/독립 과제)은 아직 안 함**
 - 확정된 설계: 회차당 이미지 여러 장(엔티티 `EpisodeImage`: `episode_id`/`image_order`/`path`, `UNIQUE(episode_id, image_order)`).
   업로드 순서 = 컷 순서(클라이언트가 번호를 안 보냄). **DRAFT 회차만 업로드/재업로드 가능**(PREVIEW/PUBLIC은 409 —
   PREVIEW도 잉크 구매자에게 보일 수 있어서 잠금). 재업로드는 **전체 교체**(기존 걸 지우고 새로 다 넣음).
@@ -291,20 +304,25 @@
   `EpisodeService.delete()`에 파일 삭제 추가(DB `episode_images` 행은 `ON DELETE CASCADE`로 자동 정리,
   파일은 `EpisodeImageStorage.deleteEpisodeDir()`로 직접 삭제, best-effort라 실패해도 삭제 자체는 안 막음).
   `application.properties`에 `app.upload.root-dir`, multipart 용량 제한 추가
-- **알려진 문제 (다음에 반드시 먼저 처리)**: `./gradlew test` 91개 중 **3개 FAIL** —
+- **알려진 문제 (다음 세션 최우선 — 독립 과제 진행 중)**: `./gradlew test` 91개 중 **3개 FAIL** —
   `AdminEpisodeControllerIntegrationTest`의 상태 전환 테스트 3개(`updateStatus_draftToPreview_returns200`,
   `updateStatus_previewToPublic_returns200`, `updateStatus_draftToPublic_returns200`, 261~291번째 줄)가
-  오늘 추가한 "이미지 0장이면 전환 거부" 규칙 때문에 깨짐(이 테스트들은 이미지 없이 회차만 만들고 전환을
-  요청해서 전부 409가 나옴 - 오늘 생긴 규칙보다 먼저 작성된 테스트라 전제가 깨짐). 도윤이 원인은 스스로
-  찾음(해당 줄 정확히 지적). **고치는 건 독립 과제로 다음 세션에 진행** — 힌트: `EpisodeImageRepository`를
-  테스트에 `@Autowired`로 추가하고, `newEpisode`(164번째 줄)처럼 `EpisodeImage.builder()...save()`로
-  이미지 1장을 미리 넣어두는 헬퍼를 만들어서 3개 테스트에 적용
+  "이미지 0장이면 전환 거부" 규칙 때문에 깨짐(이 테스트들은 이미지 없이 회차만 만들고 전환을
+  요청해서 전부 409가 나옴 - 그 규칙보다 먼저 작성된 테스트라 전제가 깨짐). 도윤이 원인은 스스로
+  찾음(해당 줄 정확히 지적). 힌트도 이미 줌: `EpisodeImageRepository`를 테스트에 `@Autowired`로 추가하고,
+  `newEpisode`(164번째 줄)처럼 `EpisodeImage.builder()...save()`로 이미지 1장을 미리 넣어두는 헬퍼를 만들어서
+  3개 테스트에 적용. **2026-11-25에 독립 과제를 시작함**: "테스트가 통과하려면 뭘 준비해줘야 할까?"라는
+  질문을 던진 상태에서 도윤이 아직 답하기 전에 세션 종료(완성 코드/부분 코드 아직 안 줌, 지침 6번 ①단계).
+  **다음 세션은 바로 이 질문에서 이어서 시작** — 처음부터 다시 설명하지 말 것
 - 아직 안 한 것: 업로드 API 자체의 통합 테스트(`AdminEpisodeImageControllerIntegrationTest` 같은 것 없음),
   실제로 파일이 디스크에 써지는지/재업로드 시 전체 교체가 제대로 되는지 수동 검증, 코드 설명 4~5개 클래스,
   이해도 퀴즈, 독립 과제. 컴파일은 성공 확인(`gradlew compileJava`)했지만 업로드 플로우 자체는 실행해본 적 없음
 
 ## 다음에 할 일 (다음 세션 시작 시 복습 퀴즈부터)
-- **최우선 (다른 작업 들어가기 전에 반드시 완전히 정리)**: `AuthService.refresh()` / `noRollbackFor` 범위 문제
+- **최우선 1 (진행 중인 독립 과제, 바로 이어서)**: 웹툰 이미지 업로드 API 섹션의 "알려진 문제" 참고 —
+  상태 전환 테스트 3개 FAIL을 고치는 독립 과제. "테스트가 통과하려면 뭘 준비해줘야 할까?" 질문까지 던져놓고
+  답을 듣기 전에 세션이 끝남. 처음부터 다시 설명하지 말고 이 질문부터 이어서 시작할 것
+- **최우선 2 (다른 작업 들어가기 전에 반드시 완전히 정리)**: `AuthService.refresh()` / `noRollbackFor` 범위 문제
   (2026-11-18 복습에서 끝내 본인 말로 정리 못 하고 다음으로 미룸). 걸렸던 지점 요약:
   - `noRollbackFor(ResponseStatusException.class)`가 메서드 전체에 적용된다는 것 자체는 맞게 답함
   - 막혔던 지점: "코드상 위에 있는 분기(토큰 없음, A)가 먼저 실행되고 그 다음 분기(탈취 의심, B)가 실행된다"는
