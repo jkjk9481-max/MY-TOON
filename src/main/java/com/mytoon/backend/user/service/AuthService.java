@@ -78,22 +78,27 @@ public class AuthService {
     @Transactional(noRollbackFor = ResponseStatusException.class)
     // 탈취 의심 시 "다른 기기 토큰 전체 무효화"를 해놓고 401을 던지는데, 기본 설정이면 예외 때문에
     // 그 무효화 자체가 롤백되어 버린다. 그래서 이 예외만큼은 롤백하지 않도록 예외처리.
+
+    // 헌 입장권 ( Refresh Token ) 을 내면 새 입장권 두 장 ( Access Token , Refresh Token ) 을 준다
     public LoginResult refresh(String rawToken) {
+        // 이런 입장권이 장부에 있나? 확인
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(rawToken))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다.")); // 없으면 401
 
         if (refreshToken.isRevoked()) {
             // 이미 폐기된(= 한 번 쓰인) 토큰이 다시 들어옴 -> 탈취 의심 -> 이 유저의 모든 기기 로그아웃
-            revokeAllActiveTokensOf(refreshToken.getUser());
+            revokeAllActiveTokensOf(refreshToken.getUser());  // 이 사람 입장권 전부 폐기
             throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED, // 401
                     "이미 사용된 Refresh Token입니다. 보안을 위해 모든 기기에서 로그아웃되었습니다.");
         }
 
+        // 유효기간이 지났나??
         if (refreshToken.getExpiresAt().isBefore(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해주세요.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다. 다시 로그인해주세요."); // 401
         }
 
+        // 다 통과 : 헌 것에 도장찍고 새 것 발급
         refreshToken.revoke(); // Rotation: 이번에 쓴 토큰은 폐기하고 새 토큰을 발급
 
         User user = refreshToken.getUser();
